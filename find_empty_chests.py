@@ -5,7 +5,7 @@ displayName = "Find empty chests"
 
 inputs = (
     ("Gaming?", True), # does ntohing.
-    ("Check console for result.", "label"),
+    ("Check console for result. Must run this filter twice without changing the selection (literally just run and then run again) to avoid a bug where mcedit skips chunks.", "label"),
 )
 
 def perform(level, box, options):
