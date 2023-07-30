@@ -93,11 +93,11 @@ def get_mask(smoothing, shape):
     # x,z,y order.
     mask = []
     for x in xrange(-smoothing, smoothing):
-        for y in xrange(-smoothing, smoothing):
-            for z in xrange(-smoothing, smoothing):
+        for z in xrange(-smoothing, smoothing):
+            for y in xrange(-smoothing, smoothing):
                 # Make shape.
                 if shape == "sphere":
-                    if x*d + y*y + z*z > smoothing*smoothing:
+                    if x*x + y*y + z*z > smoothing*smoothing:
                         continue
                 elif shape == "diamond":
                     if abs(x) + abs(y) + abs(z) > smoothing:
