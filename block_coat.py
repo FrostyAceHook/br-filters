@@ -11,7 +11,7 @@ inputs = (
     ("Replace:", alphaMaterials.Air),
     ("Block:", alphaMaterials.Stone),
     ("Depth:", (1, 1, 32767)),
-    ("For every \"find\" block in the selection, searches the blocks around if that satisfy the \"replace\" block and replaces them with the \"block\" block, to a max depth of \"depth\".","label"),
+    ("For every \"find\" block in the selection, searches the blocks around it that satisfy the \"replace\" block and replaces them with the \"block\" block, to a max depth of \"depth\".","label"),
 )
 
 

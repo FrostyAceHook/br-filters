@@ -30,9 +30,9 @@ class Perlin:
     def __init__(self, box, scale, octave):
         self.scale = scale
         self.octave = octave
-        width  = int((box.width  - 1) / scale) + 2 # x
-        height = int((box.height - 1) / scale) + 2 # y
-        length = int((box.length - 1) / scale) + 2 # z
+        width  = int((box.width  - 1) / scale) + 2
+        height = int((box.height - 1) / scale) + 2
+        length = int((box.length - 1) / scale) + 2
         self.nodes = np.random.rand(width, height, length)
 
         if self.octave > 1:

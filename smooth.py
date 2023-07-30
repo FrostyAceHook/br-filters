@@ -6,14 +6,13 @@ displayName = "Smooth (brain)"
 inputs = (
     ("Smoothing strength:", (3, 1, 100)),
     ("Mask:", ("sphere", "cube", "diamond")),
-    ("Smooths the selection. Very slow with large smooth strengths (>10). Recommended to use on a single block type then do variations later as it will mess up the distribution of block types.", "label")
+    ("Smooths the selection. Very slow with large smooth strengths (>10). Recommended to use on a single block type then do variations later as it will mess up the distribution of block types. The mask shape vaguely influences the final result to look more like itself.", "label")
 )
 
 
 # Smoothing algorithm:
 # Works by literally replacing every block in the selection with the most common
 # block around that particular block, effectively averaging out any outliers.
-
 
 
 def perform(level, box, options):
@@ -93,19 +92,20 @@ def get_cache(level, box):
 def get_mask(smoothing, shape):
     # x,z,y order.
     mask = []
-    for dx in xrange(-smoothing, smoothing):
-        for dz in xrange(-smoothing, smoothing):
-            for dy in xrange(-smoothing, smoothing):
+    for x in xrange(-smoothing, smoothing):
+        for y in xrange(-smoothing, smoothing):
+            for z in xrange(-smoothing, smoothing):
                 # Make shape.
                 if shape == "sphere":
-                    if dx*dx + dy*dy + dz*dz > smoothing*smoothing:
+                    if x*d + y*y + z*z > smoothing*smoothing:
                         continue
                 elif shape == "diamond":
-                    if dx + dy + dz > smoothing:
+                    if abs(x) + abs(y) + abs(z) > smoothing:
                         continue
                 # "cube" has no coords culled.
 
-                mask.append([dx + smoothing, dz + smoothing, dy + smoothing])
+                # Ensure x,z,y order.
+                mask.append([smoothing + x, smoothing + z, smoothing + y])
 
     indices = np.array(mask).T
     return indices
