@@ -1,6 +1,5 @@
-import time
+from itertools import product
 from pymclevel import alphaMaterials
-import math
 
 displayName = "Mark Centre"
 
@@ -10,37 +9,26 @@ inputs = (
 )
 
 
-# Why isnt this the default floor?
-def ifloor(x):
-    return int(math.floor(x))
-
-
 def perform(level, box, options):
-    start = time.time()
-
     block_id = options["Block:"].ID
     block_data = options["Block:"].blockData
 
+    # Find the floored middle.
+    x = box.minx + box.width /2
+    z = box.minz + box.length/2
+    y = box.miny + box.height/2
 
-    # Find the exact middles.
-    x = box.minx + box.width/2.0
-    y = box.miny + box.height/2.0
-    z = box.minz + box.length/2.0
-
-    # Find the integer middles.
-    x = [ifloor(x)] if box.width%2 else [ifloor(x) - 1, ifloor(x)]
-    y = [ifloor(y)] if box.height%2 else [ifloor(y) - 1, ifloor(y)]
-    z = [ifloor(z)] if box.length%2 else [ifloor(z) - 1, ifloor(z)]
+    # Find the actual middles.
+    X = [x] if (box.width  % 2) else [x - 1, x]
+    Z = [z] if (box.length % 2) else [z - 1, z]
+    Y = [y] if (box.height % 2) else [y - 1, y]
 
     # Mark the centre.
-    for cx in x:
-        for cy in y:
-            for cz in z:
-                level.setBlockAt(cx, cy, cz, block_id)
-                level.setBlockDataAt(cx, cy, cz, block_data)
+    for cx, cz, cy in product(X, Z, Y):
+        level.setBlockAt(cx, cy, cz, block_id)
+        level.setBlockDataAt(cx, cy, cz, block_data)
 
 
     level.markDirtyBox(box)
-    end = time.time()
-    print("Finished in {} seconds.".format(round(end-start, 2)))
+    print "Finished marking centre."
     return

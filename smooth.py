@@ -1,12 +1,15 @@
-import time
+import br
 import numpy as np
+from pymclevel import alphaMaterials, BoundingBox
 
-displayName = "Smooth (brain)"
+displayName = "Smoother (brain)"
 
 inputs = (
-    ("Smoothing strength:", (3, 1, 100)),
-    ("Mask:", ("sphere", "cube", "diamond")),
-    ("Smooths the selection. Very slow with large smooth strengths (>10). Recommended to use on a single block type then do variations later as it will mess up the distribution of block types. The mask shape vaguely influences the final result to look more like itself.", "label")
+    ("Strength:", (3, 1, 20)),
+    ("Void:", alphaMaterials.Air),
+    ("Fill:", alphaMaterials.Stone),
+    ("Replaces the selection with a smoothed version of the blocks. The filter analyses the selection as if it only contained two block types, \"void\" and not void. It then smoothes this hypothetical terrain and pastes it back into the level, filling any not void with \"fill\".", "label"),
+    ("IT WILL DESTROY ANY BLOCK TYPE VARIATION", "label"),
 )
 
 
@@ -16,102 +19,111 @@ inputs = (
 
 
 def perform(level, box, options):
-    start = time.time()
+    strength = options["Strength:"]
 
-    smoothing = options["Smoothing strength:"]
-    shape = options["Mask:"]
+    print "Strength: {}".format(strength)
 
+    # Get the void and fill blocks.
+    vid, vdata = options["Void:"].ID, options["Void:"].blockData
+    fid, fdata = options["Fill:"].ID, options["Fill:"].blockData
 
-    print("Caching (all me bitch).")
-    # Cache of blocks, in x,z,y order where 0,0,0 is the minimum corner of the
-    # box, minus smoothing in all dimensions. Significantly speeds things up
-    # since it's using numpy access as opposed to slow pythonic access.
-    cache = get_cache(level, box.expand(smoothing))
+    # Cache the selection.
+    cache = get_cache(level, box, strength, vid, vdata)
 
-    # Masking indices, in x,z,y order.
-    mask = get_mask(smoothing, shape)
+    # Get the smoothed blocks. This is a boolean array where true = non-void.
+    non_void = smooth(cache, box, strength)
 
+    # Convert to actual block values.
+    bids = np.empty(non_void.shape, dtype=np.uint16)
+    bdatas = np.empty_like(bids)
 
-    print("Smoothing.")
-    print("Total y: {}".format(box.height))
-    for y in xrange(box.height):
-        if y%5 == 0:
-            print("y: {}".format(y))
-        for x in xrange(box.width):
-            for z in xrange(box.length):
-                # Shift mask.
-                mask[0,:] += x
-                mask[1,:] += z
-                mask[2,:] += y
+    # Replace the non-void blocks.
+    bids[non_void] = fid
+    bdatas[non_void] = fdata
 
-                # Get the most frequent block that occurs within the mask at this position.
-                block_id, block_data = get_block(np.bincount(cache[tuple(mask)]).argmax())
+    # Replace the void blocks.
+    bids[non_void == False] = vid # double negative.
+    bdatas[non_void == False] = vdata
 
-                # Unshift mask.
-                mask[0,:] -= x
-                mask[1,:] -= z
-                mask[2,:] -= y
-
-                # Set the block.
-                level.setBlockAt(box.minx + x, box.miny + y, box.minz + z, block_id)
-                level.setBlockDataAt(box.minx + x, box.miny + y, box.minz + z, block_data)
-
+    # Copy to level.
+    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+        ids[:] = bids[slices]
+        datas[:] = bdatas[slices]
 
     level.markDirtyBox(box)
-    end = time.time()
-    print("Finished in {} seconds.".format(round(end-start, 2)))
+    print "Finished smoothing."
     return
 
 
-def get_cache(level, box):
-    # Fortran order makes it *slightly* faster when moving block data from chunk to cache.
-    blocks = np.empty((box.width, box.length, box.height, 2), dtype=np.uint16, order='F')
+def get_cache(level, box, strength, vid, vdata):
+    # Need to expand the box to include `strength` extra blocks in all
+    # directions, so that we can find the blocks in a `strength` radius around
+    # every block in the actual selection.
+    box = box.expand(strength)
 
-    for chunk, slices, point in level.getChunkSlices(box):
-        # Translation from chunk slices to cache slices.
-        translate = tuple(chunk.bounds.origin[i] - box.origin[i] for i in (0,2,1))
-        cache_slices = [slice(s.start + t, s.stop + t) for s,t in zip(slices, translate)]
-
-        blocks[
-                cache_slices[0],
-                cache_slices[1],
-                cache_slices[2],
-                0
-            ] = chunk.Blocks[slices]
-        blocks[
-                cache_slices[0],
-                cache_slices[1],
-                cache_slices[2],
-                1
-            ] = chunk.Data[slices]
-
-    # numpy trickery to view the 4th dimension of (id, data) as one merged integer.
-    return blocks.reshape(blocks.shape[0], blocks.shape[1], -1).view(np.uint32)
+    # However, must ensure that we don't go out of bounds of the world in the y
+    # axis. For the other axes mcedit will throw for missing chunk. Immutable
+    # bounding box bruh.
+    if box.miny < 0:
+        box = BoundingBox((box.minx, 0, box.minz), box.size)
+    if box.maxy > 256:
+        box = BoundingBox(box.origin, (box.size.x, 256 - box.miny, box.size.z))
 
 
-def get_mask(smoothing, shape):
-    # x,z,y order.
-    mask = []
-    for x in xrange(-smoothing, smoothing):
-        for z in xrange(-smoothing, smoothing):
-            for y in xrange(-smoothing, smoothing):
-                # Make shape.
-                if shape == "sphere":
-                    if x*x + y*y + z*z > smoothing*smoothing:
-                        continue
-                elif shape == "diamond":
-                    if abs(x) + abs(y) + abs(z) > smoothing:
-                        continue
-                # "cube" has no coords culled.
+    # Now cache which blocks are non-void.
+    sel = np.empty(br.shape(box), dtype=bool)
+    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+        # Add the non-void masks.
+        sel[slices] = ((ids != vid) | (datas != vdata))
 
-                # Ensure x,z,y order.
-                mask.append([smoothing + x, smoothing + z, smoothing + y])
-
-    indices = np.array(mask).T
-    return indices
+    return sel, box
 
 
-def get_block(value):
-    bid = value & 0xFFFF
-    bdata = (value >> 16) & 0xFFFF
-    return bid, bdata
+
+def smooth(cache, box, strength):
+    # Unpack the cache into the selection mask and its bounding box.
+    sel, sel_box = cache
+
+    # Need to replace every value with the sum of its neighbours, up to
+    # `strength` blocks away. Cast to uint16 to be able to store that count.
+    summed = sel.astype(np.uint16)
+
+
+    # Preallocate the memory.
+    mem = np.empty_like(summed)
+    unshifted = np.empty_like(summed)
+
+    # Simple algorithm to sum in a cube around each point.
+    for axis in br.AXES:
+        # Need to copy before shifting along this axis to prevent a stack-on
+        # effect where past shifts are repeated.
+        unshifted[:] = summed
+        for by in range(-strength, strength + 1):
+            if by == 0:
+                continue
+            # Add the neighbours, using clamp to avoid excessively filling void
+            # around the world border (instead just assuming the closest layer
+            # was repeated out of bounds).
+            summed += br.shift(unshifted, by, axis, clamp=True, out=mem)
+
+
+    # Cut the summed array from the cache shape to the user selection shape.
+    # Can't just hard-code strength:len-strength because the cache shape can be
+    # unpredictable with clipping due to world boundaries.
+    box = BoundingBox(box.origin - sel_box.origin, box.size)
+    mask = br.box_slices(box)
+
+    # Do the cut.
+    summed = summed[mask]
+
+
+    # To find which blocks should be non-void, we check if it has more neighbours
+    # of non-void than not. That is, if the average block around this one is
+    # non-void. This is simply a matter of checking if it's greater than half the
+    # neighbour (cube) volume.
+    cutoff = ((2 * strength + 1) ** 3) // 2
+    non_void = (summed > cutoff)
+
+
+    # Too easy.
+    return non_void

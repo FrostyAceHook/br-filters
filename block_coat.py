@@ -1,6 +1,7 @@
-import time
+import br
+import numpy as np
+from itertools import product
 from pymclevel import alphaMaterials
-import copy
 
 displayName = "Block Coat"
 
@@ -10,136 +11,65 @@ inputs = (
     ("Replace except?", True),
     ("Replace:", alphaMaterials.Air),
     ("Block:", alphaMaterials.Stone),
-    ("Depth:", (1, 1, 32767)),
-    ("For every \"find\" block in the selection, searches the blocks around it that satisfy the \"replace\" block and replaces them with the \"block\" block, to a max depth of \"depth\".","label"),
+    ("Depth:", (1, 1, 256)),
+    ("For every \"find\" block in the selection, searches the blocks around it that are the \"replace\" block, to a maximum depth of \"depth\", and replaces them with \"block\".", "label"),
 )
 
 
-def matches(is_except, block, level, x, y, z):
-    level_block = (level.blockAt(x,y,z), level.blockDataAt(x,y,z))
-    if is_except:
-        return block != level_block
-    else:
-        return block == level_block
-
-
-
 def perform(level, box, options):
-    start = time.time()
-
     depth = options["Depth:"]
 
-    block_id = options["Block:"].ID
-    block_data = options["Block:"].blockData
+    replace = br.from_options(options, "Replace")
+    find = br.from_options(options, "Find")
 
-    replace_except = options["Replace except?"]
-    replace_block = (options["Replace:"].ID, options["Replace:"].blockData)
+    bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
-    find_except = options["Find except?"]
-    find_block = (options["Find:"].ID, options["Find:"].blockData)
+    # Get every matched block.
+    mask = matches(level, box, find, replace, depth)
 
-    # Need to cache every block to be placed until the entire search is done.
-    # This is so that replacing the blocks mid operation doesn't lead to a
-    # self-triggering endless cycle that will continue until the heat death of
-    # the universe - just less than ideal really.
+    # Place the blocks.
+    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+        cur_mask = mask[slices]
 
-    # Do initial search to find the source blocks.
-    seed = find_seed(level, box, find_except, find_block, replace_except, replace_block)
-
-
-    # Now do the depth search with this as the seed.
-    cache = coat_me(level, box, depth, seed, replace_except, replace_block)
-
-
-    # Set all the blocks in the cache.
-    for x,y,z in cache:
-        level.setBlockAt(x, y, z, block_id)
-        level.setBlockDataAt(x, y, z, block_data)
+        # Set the blocks.
+        ids[cur_mask] = bid
+        datas[cur_mask] = bdata
 
     level.markDirtyBox(box)
-    end = time.time()
-    print("Finished in {} seconds.".format(round(end-start, 2)))
+    print "Finished coating."
     return
 
 
-ADJ_MASK = tuple((x,y,z) for x in (-1,0,1) for y in (-1,0,1) for z in (-1,0,1) if abs(x)+abs(y)+abs(z)==1)
+def matches(level, box, find, replace, depth):
+    # Create the mask arrays.
+    find_mask = np.empty(br.shape(box), dtype=bool)
+    replace_mask = np.empty_like(find_mask)
+
+    # Find the masks for the whole selection.
+    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+        find_mask[slices] = find.matches(ids, datas)
+        replace_mask[slices] = replace.matches(ids, datas)
 
 
-def find_seed(level, box, find_except, find_block, replace_except, replace_block):
-    seed = set()
+    # Preallocate the memory.
+    shifted = np.empty_like(find_mask)
+    unshifted = np.empty_like(find_mask)
 
-    print("Initial pass.")
-    print("Total y: {}".format(box.height))
-    for y in xrange(box.height):
-        if y%5 == 0:
-            print("y: {}".format(y))
-        y += box.miny
-        for x in xrange(box.minx, box.maxx):
-            for z in xrange(box.minz, box.maxz):
-                # Its only purpose is to match the find block so probably should
-                # do that.
-                if not matches(find_except, find_block, level, x, y, z):
-                    continue
+    # Copy the find array and shift it around while matching with replaceable
+    # blocks. Note the original find matches are there only as a seed and will be
+    # removed after the coating.
+    mask = np.copy(find_mask)
+    for _ in range(depth):
+        # Need to store the array for each depth pass to only include adjacents
+        # and not accidentally count some diagonals.
+        unshifted[:] = mask
+        for by, axis in product((-1, 1), br.AXES):
+            # Shift the array into `shifted` to match neighbouring blocks.
+            br.shift(unshifted, by, axis, out=shifted)
 
-                # Kinda optimisation here just to check that the source actually
-                # has a replaceable block adjacent to it. It kinda just moves
-                # where the work is but this one has the status readout soooo.
-                add_it = False
-                for coord in ((x+dx, y+dy, z+dz) for dx,dy,dz in ADJ_MASK):
-                    # Gotta be in selection.
-                    if coord not in box:
-                        continue
-                    # Gotta be replaceable.
-                    if not matches(replace_except, replace_block, level, *coord):
-                        continue
-                    # Easy.
-                    add_it = True
-                    break
+            # Add intersection to matches.
+            mask |= (shifted & replace_mask)
 
-                # Add to the seed.
-                if add_it:
-                    seed.add((x,y,z))
-
-    return seed
-
-
-def coat_me(level, box, depth, seed, replace_except, replace_block):
-    # Four caches:
-    # - total: keeps it all.
-    # - current: what was just found and what we finding the adjacents of.
-    # - next: what we adding to rn.
-    # Note this importantly means the all cache won't include the intial elements
-    # of the current cache since thats the seed blocks not the replace blocks.
-    cache = set()
-    cur_cache = seed
-    next_cache = set()
-
-    print("Depth pass.")
-    for i in range(depth):
-        print("Depth: {}".format(i))
-
-        # Add the adjacents of the current layer.
-        for sx, sy, sz in cur_cache:
-            # Check all adjacents.
-            for coord in ((sx+dx, sy+dy, sz+dz) for dx,dy,dz in ADJ_MASK):
-                # Gotta be in selection.
-                if coord not in box:
-                    continue
-                # Can't have already been checked and can't be a seed block.
-                if coord in cache or coord in seed:
-                    continue
-                # Gotta be replaceable.
-                if not matches(replace_except, replace_block, level, *coord):
-                    continue
-                # Too easy.
-                next_cache.add(coord)
-
-        # Update caches.
-        cache.update(next_cache)
-        cur_cache = next_cache
-        next_cache = set()
-
-    # idk if returning is strictly necessary man fuck python mutability. gimme c
-    # any day. id rather seg fault than be uncertain as to whether this return
-    # is necessary or not.
-    return cache
+    # Remove the find matches which were added only to seed.
+    mask[find_mask] = False
+    return mask

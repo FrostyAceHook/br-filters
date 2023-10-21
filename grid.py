@@ -1,11 +1,15 @@
-import time
+import br
+import numpy as np
 from pymclevel import alphaMaterials
 
-displayName = "Gridify 2"
+displayName = "Gridify 3"
+# i have no idea what gridify 1 was. but ig i better make this gridify 3...
+#  - me, moments before the creation of gridify 3
+
 
 inputs = (
-    ("Find except?", True),
-    ("Find:", alphaMaterials.Air),
+    ("Replace except?", True),
+    ("Replace:", alphaMaterials.Air),
     ("Block 1:", alphaMaterials.Stone),
     ("Block 2:", alphaMaterials.Cobblestone),
     ("Swap blocks?", False),
@@ -13,44 +17,51 @@ inputs = (
 )
 
 
-def matches(is_except, block, level, x, y, z):
-    level_block = (level.blockAt(x,y,z), level.blockDataAt(x,y,z))
-    if is_except:
-        return block != level_block
-    else:
-        return block == level_block
-
-
 def perform(level, box, options):
-    start = time.time()
+    # Get some options.
+    replace = br.from_options(options, "Replace")
+    place = br.from_options(options, "Block", count=2)
+    swap = int(options["Swap blocks?"])
 
-    block_id = (options["Block 1:"].ID, options["Block 2:"].ID)
-    block_data = (options["Block 1:"].blockData, options["Block 2:"].blockData)
-
-    find_except = options["Find except?"]
-    find_block = (options["Find:"].ID, options["Find:"].blockData)
+    # Make an array of the blocks the size of the selection, in the grid fill.
+    # This is then selectively copied into the level to achive the grid.
+    bids, bdatas = blocks(box, place, swap)
 
     # Do the thang.
-    print("Total y: {}".format(box.height))
-    for y in xrange(box.height):
-        if y%5 == 0:
-            print("y: {}".format(y))
-        y += box.miny
-        for x in xrange(box.minx, box.maxx):
-            for z in xrange(box.minz, box.maxz):
+    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+        # Get the block matches (she was a moth to the flame type shit).
+        mask = replace.matches(ids, datas)
 
-                # Gotta match the find block.
-                if not matches(find_except, find_block, level, x, y, z):
-                    continue
+        # Get the current slice of the blocks.
+        cur_bids = bids[slices]
+        cur_bdatas = bdatas[slices]
 
-                # Cheekily incorperate the swap option.
-                is_odd = (x + y + z + int(options["Swap blocks?"]))%2
-
-                level.setBlockAt(x, y, z, block_id[is_odd])
-                level.setBlockDataAt(x, y, z, block_data[is_odd])
+        # Set the blocks.
+        ids[mask] = cur_bids[mask]
+        datas[mask] = cur_bdatas[mask]
 
 
     level.markDirtyBox(box)
-    end = time.time()
-    print("Finished in {} seconds.".format(round(end-start, 2)))
+    print "Finished gridifying."
+    # you ever just wanna eat a shoe.
+    # i eat sneakers.
     return
+
+
+def blocks(box, place, swap):
+    # Create the storage arrays to fill with the grid pattern.
+    bids = np.empty(br.shape(box), dtype=np.uint16)
+    bdatas = np.empty_like(bids)
+
+    # Calculate the indices to every second block.
+    w, l, h = br.shape(box)
+    index = (np.arange(w)[:, None, None] + np.arange(l)[:, None] + np.arange(h) +
+            swap) % 2 # cheekily incorperate the swap option.
+
+    # Put the correct data in.
+    bids[index == 0] = place.ids[0]
+    bids[index == 1] = place.ids[1]
+    bdatas[index == 0] = place.datas[0]
+    bdatas[index == 1] = place.datas[1]
+
+    return bids, bdatas

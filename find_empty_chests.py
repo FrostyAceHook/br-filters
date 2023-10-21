@@ -1,41 +1,30 @@
-import time
+import br
 from pymclevel import TileEntity
 
 displayName = "Find empty chests"
 
 inputs = (
-    ("Gaming?", True), # does ntohing.
-    ("Check console for result. Must run this filter twice without changing the selection (literally just run and then run again) to avoid a bug where mcedit skips chunks.", "label"),
+    ("Gaming?", True), # does ntohing lmoa.
+    ("Check the console for the results.", "label"),
 )
 
 def perform(level, box, options):
-    start = time.time()
-
     # Store all coordinates of empty chests.
-    all_coords = []
+    positions = []
 
-    print("Total chunks: {}".format(sum(1 for _ in level.getChunkSlices(box))))
+    # Iterate the tile entities.
+    for eid, pos, te in br.iterate(level, box, method=br.TES):
+        # Check it's a chest. First value is for pre 1.11, second for post.
+        if eid not in {"Chest", "minecraft:chest"}:
+            continue
 
-    count = 0
-    for chunk, slices, point in level.getChunkSlices(box):
-        count += 1
-        if count%5==0:
-            print("Chunk: {}".format(count))
+        # Add it if it's empty.
+        if len(te["Items"]) == 0:
+            poses.append(pos)
 
-        for te in chunk.TileEntities:
-            if TileEntity.pos(te) not in box:
-                continue
-
-            if te["id"].value not in {"Chest", "minecraft:chest"}:
-                continue
-
-            if len(te["Items"]) == 0:
-                all_coords.append(TileEntity.pos(te))
-
-    print("Found {} empty chest{}.".format(len(all_coords), "s" if len(all_coords)!=1 else ""))
-    for coord in all_coords:
-        print("({}, {}, {})".format(*coord))
-
-    end = time.time()
-    print("Finished in {} seconds.".format(round(end-start, 2)))
+    # Print the findings.
+    count = len(positions)
+    print "Found {} empty chest{}.".format(count, "s" if (count != 1) else "")
+    for pos in positions:
+        print pos
     return

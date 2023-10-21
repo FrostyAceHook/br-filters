@@ -1,7 +1,8 @@
-import time
-from pymclevel import alphaMaterials
+import br
+import numpy as np
+from pymclevel import alphaMaterials, BoundingBox
 
-displayName = "Fill Shell"
+displayName = "Shell"
 
 inputs = (
     ("Block:", alphaMaterials.Bedrock),
@@ -10,114 +11,41 @@ inputs = (
 
 
 def perform(level, box, options):
-    start = time.time()
+    bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
-    block_id = options["Block:"].ID
-    block_data = options["Block:"].blockData
+    # Get the block mask.
+    mask = get_mask(box)
 
-    width = box.maxx-box.minx
-    height = box.maxy-box.miny
-    length = box.maxz-box.minz
+    # Place em.
+    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+        cur_mask = mask[slices]
 
-    # Check if it needs to be a ring.
-    do_ring = False
-    for dim in (width, height, length):
-        if dim == 1:
-            if do_ring:
-                raise Exception("Cannot have a selection with more than one dimension length of 1.")
-            do_ring = True
-
-    if do_ring:
-        ring(level, box, block_id, block_data)
-    else:
-        shell(level, box, block_id, block_data)
+        ids[cur_mask] = bid
+        datas[cur_mask] = bdata
 
     level.markDirtyBox(box)
-    end = time.time()
-    print("Finished in {} seconds.".format(round(end-start, 2)))
+    print "Finished shelling."
     return
 
 
+def get_mask(box):
+    if sum(d == 1 for d in box.size) > 1:
+        raise Exception("Cannot have a selection with more than one dimension length of 1.")
 
-def shell(level, box, block_id, block_data):
-    # z top and bottom.
-    for x in xrange(box.minx, box.maxx):
-        for y in xrange(box.miny, box.maxy):
-            level.setBlockAt(x, y, box.minz, block_id)
-            level.setBlockDataAt(x, y, box.minz, block_data)
+    # Basic idea: create a smaller box inside the main one which to not include
+    # positions from.
 
-            level.setBlockAt(x, y, box.maxz-1, block_id)
-            level.setBlockDataAt(x, y, box.maxz-1, block_data)
+    # Shrink in every direction except for any with 1 length (may be none).
+    shrinked_box = BoundingBox(size=box.size) # relative to 0,0,0.
+    shrinked_box = shrinked_box.expand(*(-(d != 1) for d in box.size))
+    # shrunk
+    # shronk
+    # shrenk
 
-    # y top and bottom.
-    for x in xrange(box.minx, box.maxx):
-        for z in xrange(box.minz, box.maxz):
-            level.setBlockAt(x, box.miny, z, block_id)
-            level.setBlockDataAt(x, box.miny, z, block_data)
+    # Mask every block.
+    mask = np.ones(br.shape(box), dtype=bool)
 
-            level.setBlockAt(x, box.maxy-1, z, block_id)
-            level.setBlockDataAt(x, box.maxy-1, z, block_data)
+    # Exclude the inner box.
+    mask[br.box_slices(shrinked_box)] = 0
 
-    # x top and bottom.s
-    for y in xrange(box.miny, box.maxy):
-        for z in xrange(box.minz, box.maxz):
-            level.setBlockAt(box.minx, y, z, block_id)
-            level.setBlockDataAt(box.minx, y, z, block_data)
-
-            level.setBlockAt(box.maxx-1, y, z, block_id)
-            level.setBlockDataAt(box.maxx-1, y, z, block_data)
-    return
-
-
-def ring(level, box, block_id, block_data):
-    width = box.maxx-box.minx
-    height = box.maxy-box.miny
-    length = box.maxz-box.minz
-
-    # ew. im sorry you have to see this.
-
-    if width == 1:
-        for y in xrange(box.miny, box.maxy):
-            level.setBlockAt(        box.minx,    y,    box.minz,    block_id)
-            level.setBlockDataAt(    box.minx,    y,    box.minz,    block_data)
-
-            level.setBlockAt(        box.minx,    y,    box.maxz-1,    block_id)
-            level.setBlockDataAt(    box.minx,    y,    box.maxz-1,    block_data)
-
-        for z in xrange(box.minz, box.maxz):
-            level.setBlockAt(        box.minx,    box.miny,    z,    block_id)
-            level.setBlockDataAt(    box.minx,    box.miny,    z,    block_data)
-
-            level.setBlockAt(        box.minx,    box.maxy-1,    z,    block_id)
-            level.setBlockDataAt(    box.minx,    box.maxy-1,    z,    block_data)
-
-    elif height == 1:
-        for x in xrange(box.minx, box.maxx):
-            level.setBlockAt(        x,    box.miny,    box.minz,    block_id)
-            level.setBlockDataAt(    x,    box.miny,    box.minz,    block_data)
-
-            level.setBlockAt(        x,    box.miny,    box.maxz-1,    block_id)
-            level.setBlockDataAt(    x,    box.miny,    box.maxz-1,    block_data)
-
-        for z in xrange(box.minz, box.maxz):
-            level.setBlockAt(        box.minx,    box.miny,    z,    block_id)
-            level.setBlockDataAt(    box.minx,    box.miny,    z,    block_data)
-
-            level.setBlockAt(        box.maxx-1,    box.miny,    z,    block_id)
-            level.setBlockDataAt(    box.maxx-1,    box.miny,    z,    block_data)
-
-    elif length == 1:
-        for x in xrange(box.minx, box.maxx):
-            level.setBlockAt(        x,    box.miny,    box.minz,    block_id)
-            level.setBlockDataAt(    x,    box.miny,    box.minz,    block_data)
-
-            level.setBlockAt(        x,    box.maxy-1,    box.minz,    block_id)
-            level.setBlockDataAt(    x,    box.maxy-1,    box.minz,    block_data)
-
-        for y in xrange(box.miny, box.maxy):
-            level.setBlockAt(        box.minx,    y,    box.minz,    block_id)
-            level.setBlockDataAt(    box.minx,    y,    box.minz,    block_data)
-
-            level.setBlockAt(        box.maxx-1,    y,    box.minz,    block_id)
-            level.setBlockDataAt(    box.maxx-1,    y,    box.minz,    block_data)
-    return
+    return mask
