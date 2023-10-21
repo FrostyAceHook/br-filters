@@ -61,9 +61,16 @@ def get_cache(level, box, strength, vid, vdata):
     # every block in the actual selection.
     box = box.expand(strength)
 
-    # However, must ensure that we don't go out of bounds of the world in the y
-    # axis. For the other axes mcedit will throw for missing chunk. Immutable
-    # bounding box bruh.
+
+    # However, must ensure that we don't go out of bounds of the world. So check
+    # all the chunks the box touches actually exist.
+    for cx, cz in box.chunkPositions:
+        if not level.containsChunk(cx, cz):
+            raise Exception("Selection is too close to missing chunks.")
+
+
+    # We can just clamp the y axis. This clamping is dealt with in `smooth`, by
+    # assuming that the closest layer is repeated out-of-bounds.
     if box.miny < 0:
         box = BoundingBox((box.minx, 0, box.minz), box.size)
     if box.maxy > 256:
@@ -102,8 +109,8 @@ def smooth(cache, box, strength):
             if by == 0:
                 continue
             # Add the neighbours, using clamp to avoid excessively filling void
-            # around the world border (instead just assuming the closest layer
-            # was repeated out of bounds).
+            # around the world top/bottom (instead assuming the closest layer was
+            # repeated out of bounds).
             summed += br.shift(unshifted, by, axis, clamp=True, out=mem)
 
 
