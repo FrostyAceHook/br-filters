@@ -23,22 +23,25 @@ def perform(level, box, options):
     place = br.from_options(options, "Block", count=2)
     swap = int(options["Swap blocks?"])
 
-    # Make an array of the blocks the size of the selection, in the grid fill.
-    # This is then selectively copied into the level to achive the grid.
-    bids, bdatas = blocks(box, place, swap)
+    # Make true/false alternating in a grid the size of the selection.
+    w, l, h = br.shape(box)
+    odd = (np.arange(w)[:, None, None] + np.arange(l)[:, None] + np.arange(h) +
+            swap) % 2 # cheekily incorperate the swap option.
 
     # Do the thang.
     for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
         # Get the block matches (she was a moth to the flame type shit).
         mask = replace.matches(ids, datas)
 
-        # Get the current slice of the blocks.
-        cur_bids = bids[slices]
-        cur_bdatas = bdatas[slices]
+        # Get the current slice of the odd array.
+        cur_odd = odd[slices]
 
-        # Set the blocks.
-        ids[mask] = cur_bids[mask]
-        datas[mask] = cur_bdatas[mask]
+        # Set ecah block type.
+        for i, (bid, bdata) in enumerate(place):
+            # Only place on "replace" block and at either odd or even positions.
+            cur_mask = (mask & (cur_odd == i))
+            ids[cur_mask] = bid
+            datas[cur_mask] = bdata
 
 
     level.markDirtyBox(box)
@@ -46,22 +49,3 @@ def perform(level, box, options):
     # you ever just wanna eat a shoe.
     # i eat sneakers.
     return
-
-
-def blocks(box, place, swap):
-    # Create the storage arrays to fill with the grid pattern.
-    bids = np.empty(br.shape(box), dtype=np.uint16)
-    bdatas = np.empty_like(bids)
-
-    # Calculate the indices to every second block.
-    w, l, h = br.shape(box)
-    index = (np.arange(w)[:, None, None] + np.arange(l)[:, None] + np.arange(h) +
-            swap) % 2 # cheekily incorperate the swap option.
-
-    # Put the correct data in.
-    bids[index == 0] = place.ids[0]
-    bids[index == 1] = place.ids[1]
-    bdatas[index == 0] = place.datas[0]
-    bdatas[index == 1] = place.datas[1]
-
-    return bids, bdatas

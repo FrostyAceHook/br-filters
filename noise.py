@@ -135,7 +135,7 @@ def stuartian_noise(shape, scale, octaves):
 
     # Correct the values of the noise, which shifts the distribution such that
     # it's roughly a uniform distribution. Currently, it's very centre-focussed
-    # so this just spreads it towrads the edges of 0 and 1.
+    # so this just spreads it towards the edges of 0 and 1.
     noise = correct(noise, scale)
 
 
@@ -152,8 +152,8 @@ def lerp(data, axis, scale):
     # Repeat for the negative direction and sum.
 
     # Simple count down from [1, 0) in `scale` number of steps.
-    weights = np.arange(scale - 1, -1, -1, dtype=float)
-    weights = (weights + 1.0) / scale
+    weights = np.arange(scale, 0, -1, dtype=float)
+    weights /= scale
 
     # Pad the dimensions of weights and set it up along the correct axis.
     pad_dims = (None,)*axis + (slice(None),) + (None,)*(data.ndim - axis - 1)

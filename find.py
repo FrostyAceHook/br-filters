@@ -21,7 +21,7 @@ BLOCK_IDS = OrderedDict([
 
 ENTITY_IDS = OrderedDict([
     ("item frame", {"ItemFrame", "minecraft:item_frame"}),
-    ("ninecart chest", {"MinecartChest", "minecraft:chest_minecart"}),
+    ("minecart chest", {"MinecartChest", "minecraft:chest_minecart"}),
     ("minecart hopper", {"MinecartHopper", "minecraft:hopper_minecart"}),
 ])
 
@@ -30,16 +30,14 @@ def to_option(name):
     return "{}s:".format(name.capitalize())
 
 
-inputs = [
+inputs = (
     ("Check the console for the results. The item id doesn't need the \"minecraft:\".", "label"),
     ("Item id:", "string"),
     ("Item data:", (0, 0, 32767)),
     ("Find in ...", "label"),
-]
+)
 # Add the container options.
-inputs += [(to_option(name), True) for name in BLOCK_IDS]
-inputs += [(to_option(name), True) for name in ENTITY_IDS]
-inputs = tuple(inputs)
+inputs += tuple((to_option(name), True) for name in chain(BLOCK_IDS, ENTITY_IDS))
 
 
 def perform(level, box, options):

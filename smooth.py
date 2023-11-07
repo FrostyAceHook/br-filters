@@ -33,22 +33,19 @@ def perform(level, box, options):
     # Get the smoothed blocks. This is a boolean array where true = non-void.
     non_void = smooth(cache, box, strength)
 
-    # Convert to actual block values.
-    bids = np.empty(non_void.shape, dtype=np.uint16)
-    bdatas = np.empty_like(bids)
-
-    # Replace the non-void blocks.
-    bids[non_void] = fid
-    bdatas[non_void] = fdata
-
-    # Replace the void blocks.
-    bids[non_void == False] = vid # double negative.
-    bdatas[non_void == False] = vdata
-
     # Copy to level.
     for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
-        ids[:] = bids[slices]
-        datas[:] = bdatas[slices]
+        # Get the non-void mask of this slice.
+        nv = non_void[slices]
+
+        # Replace the non-void blocks.
+        ids[nv] = fid
+        datas[nv] = fdata
+
+        # Replace the void blocks.
+        ids[nv == False] = vid # double negative.
+        datas[nv == False] = vdata
+
 
     level.markDirtyBox(box)
     print "Finished smoothing."

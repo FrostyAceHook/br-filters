@@ -51,18 +51,14 @@ def perform(level, box, options):
         # Use digitize to convert each value to a block index.
         block_indices = np.digitize(block_randoms, block_cumweights)
 
-        # Store the new ids and datas in here.
-        new_ids = np.empty_like(ids)
-        new_datas = np.empty_like(datas)
-
         # Convert the block indices to the actual ids/datas.
         for i, (bid, bdata) in enumerate(place):
-            new_ids[block_indices == i] = bid
-            new_datas[block_indices == i] = bdata
+            # Find the blocks of this index, only replacing the "replace" blocks.
+            cur_mask = (mask & (block_indices == i))
 
-        # Set the new blocks, only replacing the correct blocks.
-        ids[mask] = new_ids[mask]
-        datas[mask] = new_datas[mask]
+            # Set the blocks of this type.
+            ids[cur_mask] = bid
+            datas[cur_mask] = bdata
 
 
     level.markDirtyBox(box)

@@ -10,8 +10,7 @@ inputs = (
 
 
 def perform(level, box, options):
-    block_id = options["Block:"].ID
-    block_data = options["Block:"].blockData
+    bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
     # Find the floored middle.
     x = box.minx + box.width /2
@@ -25,8 +24,8 @@ def perform(level, box, options):
 
     # Mark the centre.
     for cx, cz, cy in product(X, Z, Y):
-        level.setBlockAt(cx, cy, cz, block_id)
-        level.setBlockDataAt(cx, cy, cz, block_data)
+        level.setBlockAt(cx, cy, cz, bid)
+        level.setBlockDataAt(cx, cy, cz, bdata)
 
 
     level.markDirtyBox(box)
