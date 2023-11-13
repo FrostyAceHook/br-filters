@@ -21,7 +21,7 @@ BLOCK_IDS = OrderedDict([
 
 ENTITY_IDS = OrderedDict([
     ("item frame", {"ItemFrame", "minecraft:item_frame"}),
-    ("ninecart chest", {"MinecartChest", "minecraft:chest_minecart"}),
+    ("minecart chest", {"MinecartChest", "minecraft:chest_minecart"}),
     ("minecart hopper", {"MinecartHopper", "minecraft:hopper_minecart"}),
 ])
 
