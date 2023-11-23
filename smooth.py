@@ -54,54 +54,84 @@ def perform(level, box, options):
         datas[nv == False] = vdata
 
 
+    # For a couple laughs just to break up the monotony, calculate a score of how
+    # smooth the original blocks were.
+
+    expanded, expanded_box = cache
+    # Still need to correct the neighbour expansion.
+    original = expanded[mask_from(expanded_box, box)]
+
+    # Now get the absolute and proportional difference of the before and after.
+    diff = np.sum(non_void != original)
+    prop = float(diff) / box.volume
+
+    # Cheeky score transform. It look kinda like this:
+    # 100 |-,
+    #     |  \
+    #     |  |
+    #     |   \
+    #     |    \
+    #   0 |     '--_____
+    #     0     0.5     1
+    # tremble at my ascii art powers.
+    if prop > 0.02:
+        score = 100.0 * (prop - 1.0)**8
+    else:
+        score = 100.0 - 2.3318278e11 * prop**6
+    score = int(round(score))
+    # Can't have too much fun now can we. Back to work.
+    score = min(score, 99)
+
+    print "You scored... {}!{}".format(score, " ...were you even trying?" if
+            (score < 5) else "")
+
     print "Finished smoothing."
     return
 
 
 def get_cache(level, box, strength, vid, vdata):
-    # Only extracted from the iteration to not give a weird exception when
-    # checking the expanded box, if the missing chunk is actually in the original
-    # box.
-    chunks_must_exist(level, box, "Selection cannot contain missing chunks.")
-
-
     # Need to expand the box to include `strength` extra blocks in all
     # directions, so that we can find the blocks in a `strength` radius around
-    # every block in the actual selection.
-    box = box.expand(strength)
+    # every block in the actual selection. Aka, we don't need each house, we need
+    # the whole neighbourhood.
+    neighbourhood_box = box.expand(strength)
 
 
     # However, must ensure that we don't go out of bounds of the world. So check
-    # all the chunks the box touches actually exist.
-    chunks_must_exist(level, box, "Selection is too close to missing chunks.")
+    # all the chunks the box touches actually exist. Check first, with a
+    # different message, that the actual selection doesn't contain missing
+    # chunks.
+    must_exist(level, box, "Selection cannot contain missing chunks.")
+    must_exist(level, neighbourhood_box, "Selection is too close to missing "
+            "chunks.")
 
 
     # We can just clamp the y axis instead of throwing if the selection grows too
     # tall. This clamping is dealt with in `smooth`, by assuming that the closest
     # layer is repeated out-of-bounds.
-    if box.miny < 0:
-        box = BoundingBox((box.minx, 0, box.minz), box.size)
-    if box.maxy > 256:
-        box = BoundingBox(box.origin, (box.size.x, 256 - box.miny, box.size.z))
+    x, _, z = neighbourhood_box.origin
+    w, _, l = neighbourhood_box.size
+    max_box = BoundingBox((x, 0, z), (w, 256, l))
+    neighbourhood_box = neighbourhood_box.intersect(max_box)
 
 
     # Now cache which blocks are non-void.
-    sel = np.empty(br.shape(box), dtype=bool)
-    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+    neighbourhood = np.empty(br.shape(neighbourhood_box), dtype=bool)
+    for ids, datas, slices in br.iterate(level, neighbourhood_box,
+            method=br.SLICES):
         # Add the non-void masks.
-        sel[slices] = ((ids != vid) | (datas != vdata))
+        neighbourhood[slices] = ((ids != vid) | (datas != vdata))
 
-    return sel, box
+    return neighbourhood, neighbourhood_box
 
 
 
 def smooth(cache, box, strength):
-    # Unpack the cache into the selection mask and its bounding box.
-    sel, sel_box = cache
+    neighbourhood, neighbourhood_box = cache
 
     # Need to replace every value with the sum of its neighbours, up to
     # `strength` blocks away. Cast to uint16 to be able to store that count.
-    summed = sel.astype(np.uint16)
+    summed = neighbourhood.astype(np.uint16)
 
 
     # Preallocate the memory.
@@ -122,13 +152,10 @@ def smooth(cache, box, strength):
             summed += br.shift(unshifted, by, axis, clamp=True, out=mem)
 
 
-    # Cut the summed array from the cache shape to the user selection shape.
-    # Can't just hard-code strength:len-strength because the cache shape can be
-    # unpredictable with clipping due to world boundaries.
-    box = BoundingBox(box.origin - sel_box.origin, box.size)
-    mask = br.box_slices(box)
-
-    # Do the cut.
+    # Cut the summed array from the neighbourhood shape to the user selection
+    # box. Can't just hard-code strength:len-strength because the cache shape can
+    # be unpredictable with clipping due to world boundaries.
+    mask = mask_from(neighbourhood_box, box)
     summed = summed[mask]
 
 
@@ -146,7 +173,19 @@ def smooth(cache, box, strength):
 
 
 # Throws if any chunks in the given box don't exist.
-def chunks_must_exist(level, box, msg):
+def must_exist(level, box, msg):
     for cx, cz in box.chunkPositions:
         if not level.containsChunk(cx, cz):
             raise Exception(msg)
+
+
+# Returns a mask which may be applied to an array of the `neighbourhood_box`
+# which will index the blocks in `box`.
+def mask_from(neighbourhood_box, box):
+    # We want to get the intersection of the two boxes, in a mark relative to the
+    # neighbourhood. We know the neighboorhood is always larger, so the size of
+    # final mask will be the same as `box`. So we can just shift the `box` to
+    # have an origin at the origin of `neighbourhood` to find the indices we
+    # need.
+    mask_box = BoundingBox(box.origin - neighbourhood_box.origin, box.size)
+    return br.box_slices(mask_box)
