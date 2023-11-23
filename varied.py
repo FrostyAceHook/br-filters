@@ -40,8 +40,9 @@ def perform(level, box, options):
 
 
     # Iterate through the chunks, find the blocks to replace, get the proportions
-    # and set them blocks.
-    for ids, datas in br.iterate(level, box):
+    # and set them blocks. This can be holey cause skipping any missing chunks is
+    # okie dokie.
+    for ids, datas in br.iterate(level, box, holey=True):
         # Get the replacement mask.
         mask = replace.matches(ids, datas)
 
@@ -61,6 +62,5 @@ def perform(level, box, options):
             datas[cur_mask] = bdata
 
 
-    level.markDirtyBox(box)
     print "Finished varying."
     return

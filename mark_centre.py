@@ -5,7 +5,9 @@ displayName = "Mark Centre"
 
 inputs = (
     ("Block:", alphaMaterials.Glowstone),
-    ("Replaces the very centre point of the selection with the block above. Used to quickly find the centre of something. If any dimension is even in length, two blocks are placed.", "label"),
+    ("Replaces the very centre point of the selection with the block above. "
+            "Used to quickly find the centre of something (shocking). If any "
+            "dimension is even in length, two blocks are placed.", "label"),
 )
 
 
@@ -28,6 +30,5 @@ def perform(level, box, options):
         level.setBlockDataAt(cx, cy, cz, bdata)
 
 
-    level.markDirtyBox(box)
     print "Finished marking centre."
     return

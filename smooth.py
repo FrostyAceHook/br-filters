@@ -8,14 +8,21 @@ inputs = (
     ("Strength:", (3, 1, 20)),
     ("Void:", alphaMaterials.Air),
     ("Fill:", alphaMaterials.Stone),
-    ("Replaces the selection with a smoothed version of the blocks. The filter analyses the selection as if it only contained two block types, \"void\" and not void. It then smoothes this hypothetical terrain and pastes it back into the level, filling any not void with \"fill\".", "label"),
+    ("Replaces the selection with a smoothed version of the blocks. The filter "
+            "analyses the selection as if it only contains two block types, "
+            "\"void\" and not void. It then smoothes this hypothetical terrain "
+            "and pastes it back into the level, filling any not void with "
+            "\"fill\".", "label"),
     ("IT WILL DESTROY ANY BLOCK TYPE VARIATION", "label"),
 )
 
 
 # Smoothing algorithm:
 # Works by literally replacing every block in the selection with the most common
-# block around that particular block, effectively averaging out any outliers.
+# block around that particular block, effectively averaging out any outliers. The
+# algorithm looks in a cube of radius `strength` around each block to determine
+# the most common, this is mostly because it is ridiculously quick when
+# implemented with numpy shifts and additions.
 
 
 def perform(level, box, options):
@@ -47,12 +54,17 @@ def perform(level, box, options):
         datas[nv == False] = vdata
 
 
-    level.markDirtyBox(box)
     print "Finished smoothing."
     return
 
 
 def get_cache(level, box, strength, vid, vdata):
+    # Only extracted from the iteration to not give a weird exception when
+    # checking the expanded box, if the missing chunk is actually in the original
+    # box.
+    chunks_must_exist(level, box, "Selection cannot contain missing chunks.")
+
+
     # Need to expand the box to include `strength` extra blocks in all
     # directions, so that we can find the blocks in a `strength` radius around
     # every block in the actual selection.
@@ -61,13 +73,12 @@ def get_cache(level, box, strength, vid, vdata):
 
     # However, must ensure that we don't go out of bounds of the world. So check
     # all the chunks the box touches actually exist.
-    for cx, cz in box.chunkPositions:
-        if not level.containsChunk(cx, cz):
-            raise Exception("Selection is too close to missing chunks.")
+    chunks_must_exist(level, box, "Selection is too close to missing chunks.")
 
 
-    # We can just clamp the y axis. This clamping is dealt with in `smooth`, by
-    # assuming that the closest layer is repeated out-of-bounds.
+    # We can just clamp the y axis instead of throwing if the selection grows too
+    # tall. This clamping is dealt with in `smooth`, by assuming that the closest
+    # layer is repeated out-of-bounds.
     if box.miny < 0:
         box = BoundingBox((box.minx, 0, box.minz), box.size)
     if box.maxy > 256:
@@ -131,3 +142,11 @@ def smooth(cache, box, strength):
 
     # Too easy.
     return non_void
+
+
+
+# Throws if any chunks in the given box don't exist.
+def chunks_must_exist(level, box, msg):
+    for cx, cz in box.chunkPositions:
+        if not level.containsChunk(cx, cz):
+            raise Exception(msg)

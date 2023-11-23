@@ -12,7 +12,9 @@ inputs = (
     ("Replace:", alphaMaterials.Air),
     ("Block:", alphaMaterials.Stone),
     ("Depth:", (1, 1, 256)),
-    ("For every \"find\" block in the selection, searches the blocks around it that are the \"replace\" block, to a maximum depth of \"depth\", and replaces them with \"block\".", "label"),
+    ("For every \"find\" block in the selection, searches the blocks around it "
+            "that are the \"replace\" block, to a maximum depth of \"depth\", "
+            "and replaces them with \"block\".", "label"),
 )
 
 
@@ -35,7 +37,6 @@ def perform(level, box, options):
         ids[cur_mask] = bid
         datas[cur_mask] = bdata
 
-    level.markDirtyBox(box)
     print "Finished coating."
     return
 

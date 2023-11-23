@@ -19,18 +19,38 @@ ENTITIES = 4 # Iterate through the entities.
 #        in x,y,z order (`pos`), and the compound itself (`te`).
 # - ENTITIES: every entity in selection, as the entity id (`eid`), position in
 #        x,y,z order (`pos`), and the compound itself (`entity`).
-def iterate(level, box, method=BLOCKS):
+def iterate(level, box, method=BLOCKS, holey=False):
     # fucking finally found the culprit of the chunk skipping bug. i believe the
     # chunks were being unloaded before the changes could be made/saved/
     # something. idk exactly why this was happening, but keeping a reference in
     # here of every chunk seems to have fixed it.... so should be good....
     chunks = []
 
-    # Iterate through the level selection.
+    # NEVERMIND IT STILL HAPPENS.
+    # ok how about dirty every chunk immediately, AND keep a reference... surely
+    # they cant get unloaded then?? or maybe that isn't even the culprit... it
+    # does happen waaay less though now (after the previous change, haven't
+    # tested this one yet, but that seems to indicate that the problem is at
+    # least related to unloading).
     for chunk, slices, point in level.getChunkSlices(box):
-        # Keep this chunk loaded.
+        chunk.dirty = True
         chunks.append(chunk)
 
+
+    # The `getChunkSlices` method will silently skip any chunks that don't exist,
+    # but a lot of filters rely on the entire selection existing and being
+    # iterated since blocks can influence other blocks. So we need to check that
+    # the chunks do actually all exist. This isn't needed for all filters tho,
+    # filters which only process entities have no need and filters explicitly
+    # marked "holey" will be fine with missing chunks.
+    if not (method in {TES, ENTITIES} or holey):
+        for cx, cz in box.chunkPositions:
+            if not level.containsChunk(cx, cz):
+                raise Exception("Selection cannot contain missing chunks.")
+
+
+    # Iterate through the level selection.
+    for chunk, slices, point in level.getChunkSlices(box):
         # If the method is chunks, just yield the chunk.
         if method == CHUNKS:
             yield chunk

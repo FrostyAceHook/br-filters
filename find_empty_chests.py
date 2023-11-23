@@ -27,4 +27,5 @@ def perform(level, box, options):
     print "Found {} empty chest{}.".format(count, "s" if (count != 1) else "")
     for pos in positions:
         print pos
+
     return

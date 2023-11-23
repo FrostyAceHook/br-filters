@@ -11,9 +11,13 @@ inputs = (
     ("Scale:", (6, 1, 256)),
     ("Octaves:", (2, 1, 20)),
     ("Proportion:", (0.4, 0.0, 1.0)),
-    ("Scale controls the general size of the fluctations, octaves increase the chaos, proportion is roughly the percentage of blocks replaced.", "label"),
+    ("Scale controls the general size of the fluctations, octaves increase the "
+            "chaos, proportion is roughly the percentage of blocks replaced.",
+            "label"),
     ("Visualise:", False),
-    ("just a cool option that replaces the entire selection with wool based on the noise generated from \"scale\" and \"octaves\" (red = 0.0, purple = 1.0).", "label"),
+    ("just a cool option that replaces the entire selection with wool based on "
+            "the noise generated from the given \"scale\" and \"octaves\" (red "
+            "= 0.0, purple = 1.0).", "label"),
 )
 
 
@@ -28,7 +32,6 @@ inputs = (
 
 
 def perform(level, box, options):
-
     # Get those options.
     scale = options["Scale:"]
     octaves = options["Octaves:"]
@@ -54,7 +57,11 @@ def perform(level, box, options):
         # Place on the blocks where the noise is less than the proportion,
         # effectively placing about `proportion` blocks.
         mask = (noise <= proportion)
-        for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+
+        # Iterate the blocks, in a holey manner because it's ok to just skip
+        # missing chunks.
+        for ids, datas, slices in br.iterate(level, box, method=br.SLICES,
+                holey=True):
             # Line up the matches and the mask.
             cur_mask = (replace.matches(ids, datas) & mask[slices])
 
@@ -81,12 +88,12 @@ def perform(level, box, options):
         wools -= 16
 
         # Taste the rainbow bitch.
-        for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+        for ids, datas, slices in br.iterate(level, box, method=br.SLICES,
+                holey=True):
             ids[:] = 35 # wool id.
             datas[:] = wools[slices]
 
 
-    level.markDirtyBox(box)
     print "Finished making some noise."
     return
 

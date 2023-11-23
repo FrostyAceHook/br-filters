@@ -31,7 +31,8 @@ def to_option(name):
 
 
 inputs = (
-    ("Check the console for the results. The item id doesn't need the \"minecraft:\".", "label"),
+    ("Check the console for the results. The item id doesn't need the "
+            "\"minecraft:\", it will be added if not present.", "label"),
     ("Item id:", "string"),
     ("Item data:", (0, 0, 32767)),
     ("Print every location:", True),
@@ -40,7 +41,9 @@ inputs = (
 # Add the container options.
 inputs += tuple((to_option(name), True) for name in chain(BLOCK_IDS, ENTITY_IDS))
 # Let em know about the trapped chests.
-inputs += ("Note that trapped chest are not distinguished from regular chests (to emulate gameplay of course (actually bc they use the same tile entity)).", "label"),
+inputs += ("Note that trapped chest are not distinguished from regular chests "
+        "(to emulate gameplay of course (actually bc they use the same tile "
+        "entity)).", "label"),
 
 def perform(level, box, options):
     find = prefix(options["Item id:"]), options["Item data:"]

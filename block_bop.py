@@ -16,7 +16,10 @@ inputs = (
     ("Replace except?", True),
     ("Replace:", alphaMaterials.Air),
     ("Block:", alphaMaterials.Stone),
-    ("For every \"find\" block in the selection, replace a random number of blocks from the given \"direction\"; provided they are the \"replace\" block. The number of blocks is a random number between the given \"min depth\" and \"max depth\".", "label"),
+    ("For every \"find\" block in the selection, replace a random number of "
+            "blocks from the given \"direction\"; provided they are the "
+            "\"replace\" block. The number of blocks is a random number between "
+            "the given \"min depth\" and \"max depth\".", "label"),
 )
 
 
@@ -30,7 +33,7 @@ def perform(level, box, options):
     depth_max = options["Max depth:"]
     # dumas check.
     if depth_max < depth_min:
-        raise Exception("Min depth must be less than max depth.")
+        raise Exception("Min depth must be <= max depth.")
 
     print "Direction: {}".format(options["Direction:"].strip())
     print "Min depth: {}".format(depth_min)
@@ -53,7 +56,6 @@ def perform(level, box, options):
         ids[cur_mask] = bid
         datas[cur_mask] = bdata
 
-    level.markDirtyBox(box)
     print "Finished block bopping."
     return
 

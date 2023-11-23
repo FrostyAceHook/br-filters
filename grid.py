@@ -28,8 +28,10 @@ def perform(level, box, options):
     odd = (np.arange(w)[:, None, None] + np.arange(l)[:, None] + np.arange(h) +
             swap) % 2 # cheekily incorperate the swap option.
 
-    # Do the thang.
-    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+    # Do the thang. Note this filter is holey, because missing chunks can just be
+    # skipped without consequence.
+    for ids, datas, slices in br.iterate(level, box, method=br.SLICES,
+            holey=True):
         # Get the block matches (she was a moth to the flame type shit).
         mask = replace.matches(ids, datas)
 
@@ -45,7 +47,6 @@ def perform(level, box, options):
             datas[cur_mask] = bdata
 
 
-    level.markDirtyBox(box)
     print "Finished gridifying."
     # you ever just wanna eat a shoe.
     # i eat sneakers.
