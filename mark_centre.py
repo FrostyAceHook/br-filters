@@ -5,13 +5,14 @@ displayName = "Mark Centre"
 
 inputs = (
     ("Block:", alphaMaterials.Glowstone),
-    ("Replaces the very centre point of the selection with the block above. Used to quickly find the centre of something. If any dimension is even in length, two blocks are placed.", "label"),
+    ("Replaces the very centre point of the selection with the block above. "
+            "Used to quickly find the centre of something (shocking). If any "
+            "dimension is even in length, two blocks are placed.", "label"),
 )
 
 
 def perform(level, box, options):
-    block_id = options["Block:"].ID
-    block_data = options["Block:"].blockData
+    bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
     # Find the floored middle.
     x = box.minx + box.width /2
@@ -25,10 +26,9 @@ def perform(level, box, options):
 
     # Mark the centre.
     for cx, cz, cy in product(X, Z, Y):
-        level.setBlockAt(cx, cy, cz, block_id)
-        level.setBlockDataAt(cx, cy, cz, block_data)
+        level.setBlockAt(cx, cy, cz, bid)
+        level.setBlockDataAt(cx, cy, cz, bdata)
 
 
-    level.markDirtyBox(box)
     print "Finished marking centre."
     return

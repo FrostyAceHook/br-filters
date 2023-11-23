@@ -6,7 +6,8 @@ displayName = "Shell"
 
 inputs = (
     ("Block:", alphaMaterials.Bedrock),
-    ("Cheeky bedrock box filter. If used with a selection where one dimension has 1 length, it will make a ring.", "label"),
+    ("Cheeky bedrock box filter. If used with a selection where one dimension "
+            "is only 1 block long, it will make a ring.", "label"),
 )
 
 
@@ -16,21 +17,23 @@ def perform(level, box, options):
     # Get the block mask.
     mask = get_mask(box)
 
-    # Place em.
-    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+    # Place em (holey style).
+    for ids, datas, slices in br.iterate(level, box, method=br.SLICES,
+            holey=True):
         cur_mask = mask[slices]
 
         ids[cur_mask] = bid
         datas[cur_mask] = bdata
 
-    level.markDirtyBox(box)
+
     print "Finished shelling."
     return
 
 
 def get_mask(box):
     if sum(d == 1 for d in box.size) > 1:
-        raise Exception("Cannot have a selection with more than one dimension length of 1.")
+        raise Exception("Cannot have a selection with more than one dimension "
+                "of length 1.")
 
     # Basic idea: create a smaller box inside the main one which to not include
     # positions from.
@@ -41,6 +44,7 @@ def get_mask(box):
     # shrunk
     # shronk
     # shrenk
+    # shrank
 
     # Mask every block.
     mask = np.ones(br.shape(box), dtype=bool)

@@ -33,15 +33,16 @@ def perform(level, box, options):
     block_weights = [options["Block {} weight:".format(i)] for i in (1,2,3,4)]
     # Check at least one weight is non-zero.
     if sum(block_weights) == 0:
-        raise Exception("Must set the weight of at least one block to non-zero champ.")
+        raise Exception("Cannot have all zero weights champ.")
 
     # Get the cumulative and scaled weights to categorise random numbers.
     block_cumweights = np.cumsum(block_weights) / float(sum(block_weights))
 
 
     # Iterate through the chunks, find the blocks to replace, get the proportions
-    # and set them blocks.
-    for ids, datas in br.iterate(level, box):
+    # and set them blocks. This can be holey cause skipping any missing chunks is
+    # okie dokie.
+    for ids, datas in br.iterate(level, box, holey=True):
         # Get the replacement mask.
         mask = replace.matches(ids, datas)
 
@@ -51,20 +52,15 @@ def perform(level, box, options):
         # Use digitize to convert each value to a block index.
         block_indices = np.digitize(block_randoms, block_cumweights)
 
-        # Store the new ids and datas in here.
-        new_ids = np.empty_like(ids)
-        new_datas = np.empty_like(datas)
-
         # Convert the block indices to the actual ids/datas.
         for i, (bid, bdata) in enumerate(place):
-            new_ids[block_indices == i] = bid
-            new_datas[block_indices == i] = bdata
+            # Find the blocks of this index, only replacing the "replace" blocks.
+            cur_mask = (mask & (block_indices == i))
 
-        # Set the new blocks, only replacing the correct blocks.
-        ids[mask] = new_ids[mask]
-        datas[mask] = new_datas[mask]
+            # Set the blocks of this type.
+            ids[cur_mask] = bid
+            datas[cur_mask] = bdata
 
 
-    level.markDirtyBox(box)
     print "Finished varying."
     return
