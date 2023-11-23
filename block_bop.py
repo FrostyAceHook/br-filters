@@ -17,16 +17,17 @@ inputs = (
     ("Replace:", alphaMaterials.Air),
     ("Block:", alphaMaterials.Stone),
     ("For every \"find\" block in the selection, replace a random number of "
-            "blocks from the given \"direction\"; provided they are the "
+            "blocks in the given \"direction\"; provided they are the "
             "\"replace\" block. The number of blocks is a random number between "
-            "the given \"min depth\" and \"max depth\".", "label"),
+            "the given \"min depth\" and \"max depth\", inclusive of each.",
+            "label"),
 )
 
 
 def perform(level, box, options):
     # Get the options.
     direction = DIRECTIONS.index(options["Direction:"])
-    sign = (1 if (direction & 1) else -1)
+    sign = (-1 if (direction & 1) else 1) # alternating +/-.
     axis = direction // 2
 
     depth_min = options["Min depth:"]
