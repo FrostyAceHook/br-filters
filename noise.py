@@ -64,11 +64,15 @@ def perform(level, box, options):
 
     else:
         # Time to acsend.
-        # red - purple, black for outlier. (hopefully doesn't happen lmao)
-        rainbow = np.array([14, 1, 4, 5, 3, 9, 11, 10, 15])
+        # red - purple
+        rainbow = np.array([14, 1, 4, 5, 3, 9, 11, 10])
 
         # Convert from the floating value to a value from 0 to len-1.
         noise *= len(rainbow) - 1
+
+        # Clip justin caseme, to not make any corrupt data.
+        noise = np.clip(noise, 0, len(rainbow) - 1)
+
         wools = noise.astype(np.uint8)
 
         # Convert from the indices to the wool data values.
@@ -117,10 +121,16 @@ def stuartian_noise(shape, scale, octaves):
     noise = noise[map(slice, shape)]
 
 
-    # Add the octaves by recursing with a smaller scale. Don't do this if the
-    # scale is already at a minimum.
+    # Correct the values of the noise, which shifts the distribution such that
+    # it's roughly a uniform distribution. Currently, it's very centre-focussed
+    # so this just spreads it towards the edges of 0 and 1. Also clips it from
+    # 0..1 but i don't think that's 100% necessary.
+    noise = correct(noise, scale)
+
+
+    # Add the octaves by recursing with a smaller scale.
     if octaves > 1:
-        # Impact value is arbitrary. Is roughly controls how impactful the next
+        # Impact value is arbitrary. It roughly controls how impactful the next
         # octave is to the noise. 0.6 seems pretty good at causing some chaos
         # without being all-consuming.
         impact = 0.6
@@ -132,15 +142,8 @@ def stuartian_noise(shape, scale, octaves):
             # Scale back to [0,1].
             noise /= (1 + impact)
 
-
-    # Correct the values of the noise, which shifts the distribution such that
-    # it's roughly a uniform distribution. Currently, it's very centre-focussed
-    # so this just spreads it towards the edges of 0 and 1.
-    noise = correct(noise, scale)
-
-
-    # justin caseme.
-    return np.clip(noise, 0.0, 1.0)
+    # Too easy.
+    return noise
 
 
 

@@ -82,8 +82,8 @@ AXES = (AXIS_X, AXIS_Z, AXIS_Y) # All typical axes.
 # Shifts the values of an array along an axis. Fills any now-empty values with 0
 # if not clamping, otherwise fills it with the first perpendicular slice of the
 # array along the shifted axis. `out` allows preallocated memory to be used,
-# which must be the same shape and dtype as `out`. `out` may be the same memory
-# as `array`, which causes an inplace shift.
+# which must be the same shape and dtype as `array`. `out` may be the same
+# memory as `array`, which causes an inplace shift.
 def shift(array, by, axis, clamp=False, out=None):
     # No need - butch "Butch" Butch.
     if by == 0:
