@@ -34,15 +34,19 @@ inputs = (
     ("Check the console for the results. The item id doesn't need the \"minecraft:\".", "label"),
     ("Item id:", "string"),
     ("Item data:", (0, 0, 32767)),
+    ("Print every location:", True),
     ("Find in ...", "label"),
 )
 # Add the container options.
 inputs += tuple((to_option(name), True) for name in chain(BLOCK_IDS, ENTITY_IDS))
-
+# Let em know about the trapped chests.
+inputs += ("Note that trapped chest are not distinguished from regular chests (to emulate gameplay of course (actually bc they use the same tile entity)).", "label"),
 
 def perform(level, box, options):
     find = prefix(options["Item id:"]), options["Item data:"]
-    print "Finding ({}, {})...".format(find[0], find[1])
+    print "Finding ({}, {}) ...".format(*find)
+
+    print_each_storage = options["Print every location:"]
 
 
     # Setup which storages to check.
@@ -57,10 +61,9 @@ def perform(level, box, options):
             entity_ids |= ENTITY_IDS[name]
 
 
-    # Counts for what's been found.
-    item_count = 0
+    # Total counts of what's been found.
+    total_count = 0
     storage_count = 0
-
 
     # Iterate through the storages, printing when something is found.
     for name, pos, items in storages(level, box, block_ids, entity_ids):
@@ -76,14 +79,26 @@ def perform(level, box, options):
 
         # Print matches, if any.
         if count > 0:
-            item_count += count
+            total_count += count
             storage_count += 1
-            print "[{}] {}: {}".format(name, pos, count)
+
+            # Format: "[chest] (0,64,0): 5", meaning found 5 items in the chest
+            # at x=0, y=64, z=0.
+            # This may not be the optimal way of the viewing the data (you may
+            # want to sort by x, by z, by count, by something), but just like
+            # copy it to a spreadsheet at that point. This is just to gen the
+            # data.
+            if print_each_storage:
+                print "[{}] {}: {}".format(name, pos, count)
 
 
     # Print total count.
-    print "Found {} across {} storage{}.".format(item_count, storage_count,
-            "s" if (storage_count != 1) else "")
+    if total_count > 0:
+        print "Found {} total, across {} storage{}.".format(total_count,
+                storage_count, "s" if storage_count != 1 else "")
+    else:
+        print "Not found."
+
     return
 
 

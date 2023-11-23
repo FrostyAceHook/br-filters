@@ -33,7 +33,7 @@ def perform(level, box, options):
     block_weights = [options["Block {} weight:".format(i)] for i in (1,2,3,4)]
     # Check at least one weight is non-zero.
     if sum(block_weights) == 0:
-        raise Exception("Must set the weight of at least one block to non-zero champ.")
+        raise Exception("Cannot have all zero weights champ.")
 
     # Get the cumulative and scaled weights to categorise random numbers.
     block_cumweights = np.cumsum(block_weights) / float(sum(block_weights))

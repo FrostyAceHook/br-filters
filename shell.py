@@ -30,7 +30,8 @@ def perform(level, box, options):
 
 def get_mask(box):
     if sum(d == 1 for d in box.size) > 1:
-        raise Exception("Cannot have a selection with more than one dimension length of 1.")
+        raise Exception("Cannot have a selection with more than one dimension "
+                "of length 1.")
 
     # Basic idea: create a smaller box inside the main one which to not include
     # positions from.
@@ -41,6 +42,7 @@ def get_mask(box):
     # shrunk
     # shronk
     # shrenk
+    # shrank
 
     # Mask every block.
     mask = np.ones(br.shape(box), dtype=bool)

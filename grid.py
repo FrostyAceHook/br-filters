@@ -36,10 +36,11 @@ def perform(level, box, options):
         # Get the current slice of the odd array.
         cur_odd = odd[slices]
 
-        # Set ecah block type.
+        # Set each block type.
         for i, (bid, bdata) in enumerate(place):
             # Only place on "replace" block and at either odd or even positions.
             cur_mask = (mask & (cur_odd == i))
+
             ids[cur_mask] = bid
             datas[cur_mask] = bdata
 
