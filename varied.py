@@ -24,7 +24,7 @@ inputs = (
     ("Block 4 weight:", (0, 0, 32767)),
     ("Replaces the \"replace\" blocks with a random block from the above four, "
             "each with a weighted proportion. If block id 256 is used and be "
-            "placed, the block is left unchanged instead.")
+            "placed, the block is left unchanged instead.", "label"),
 )
 
 
