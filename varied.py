@@ -22,6 +22,9 @@ inputs = (
     ("Block 3 weight:", (0, 0, 32767)),
     ("Block 4:", "blocktype"),
     ("Block 4 weight:", (0, 0, 32767)),
+    ("Replaces the \"replace\" blocks with a random block from the above four, "
+            "each with a weighted proportion. If block id 256 is used and be "
+            "placed, the block is left unchanged instead.")
 )
 
 
@@ -56,6 +59,10 @@ def perform(level, box, options):
         for i, (bid, bdata) in enumerate(place):
             # Find the blocks of this index, only replacing the "replace" blocks.
             cur_mask = (mask & (block_indices == i))
+
+            # id 256 means skip block.
+            if bid == 256:
+                continue
 
             # Set the blocks of this type.
             ids[cur_mask] = bid
