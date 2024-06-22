@@ -8,12 +8,13 @@ inputs = (
     ("Replace except?", True),
     ("Replace:", alphaMaterials.Air),
     ("Block:", alphaMaterials.Stone),
+    ("Seed:", 0),
     ("Scale:", (6, 1, 256)),
     ("Octaves:", (2, 1, 20)),
     ("Proportion:", (0.4, 0.0, 1.0)),
     ("Scale controls the general size of the fluctations, octaves increase the "
-            "chaos, proportion is roughly the percentage of blocks replaced.",
-            "label"),
+            "chaos, proportion is roughly the percentage of blocks replaced. "
+            "If the seed is zero, uses a random seed.", "label"),
     ("Visualise:", False),
     ("just a cool option that replaces the entire selection with wool based on "
             "the noise generated from the given \"scale\" and \"octaves\" (red "
@@ -32,12 +33,20 @@ inputs = (
 
 
 def perform(level, box, options):
+    # Get my seed.
+    seed = options["Seed:"]
+    if seed == 0:
+        np.random.seed()
+    else:
+        np.random.seed(seed)
+
     # Get those options.
     scale = options["Scale:"]
     octaves = options["Octaves:"]
     proportion = options["Proportion:"]
     visualise = options["Visualise:"]
 
+    print "Seed: {}".format(seed)
     print "Scale: {}".format(scale)
     print "Octaves: {}".format(octaves)
     if not visualise:
