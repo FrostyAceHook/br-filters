@@ -6,10 +6,12 @@ from pymclevel import alphaMaterials
 displayName = "Block Coat"
 
 inputs = (
-    ("Find except?", False),
-    ("Find:", alphaMaterials.Air),
-    ("Replace except?", True),
-    ("Replace:", alphaMaterials.Air),
+    ("NOTE: Uses a selector string for 'find' and 'replace'.\n"
+            "See `br.py` for the selector string syntax specifics. For simple "
+            "use, just type a block id/name with optional data (i.e. \"stone\" "
+            "for any stone or \"stone:3\" for diorite).", "label"),
+    ("Find:", "string"),
+    ("Replace:", "string"),
     ("Block:", alphaMaterials.Stone),
     ("Depth:", (1, 1, 256)),
     ("Expand to:", ("faces", "edges", "corners")),
@@ -25,16 +27,15 @@ def perform(level, box, options):
     depth = options["Depth:"]
     expand_to = options["Expand to:"]
 
-    replace = br.from_options(options, "Replace")
-    find = br.from_options(options, "Find")
-
+    find = br.selector("find", options["Find:"])
+    replace = br.selector("replace", options["Replace:"])
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
     # Get every matched block.
     mask = matches(level, box, find, replace, depth, expand_to)
 
     # Place the blocks.
-    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+    for ids, datas, slices in br.iterate(level, box, br.SLICES):
         cur_mask = mask[slices]
 
         # Set the blocks.
@@ -51,7 +52,7 @@ def matches(level, box, find, replace, depth, expand_to):
     replace_mask = np.empty_like(find_mask)
 
     # Find the masks for the whole selection.
-    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+    for ids, datas, slices in br.iterate(level, box, br.SLICES):
         find_mask[slices] = find.matches(ids, datas)
         replace_mask[slices] = replace.matches(ids, datas)
 

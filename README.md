@@ -20,19 +20,21 @@ all that in the mcedit filter folder.
 Most of these filters are simply an iteration over all the blocks in the
 selection, changing each block if it meets certain conditions.
 
-A simple example is the [grid](./grid.py) filter. This iterates over every block
-and replaces it if the "replace" condition is met. This condition is met if
-"replace except" is false and the block is the "replace block"; otherwise if
-"replace except" is true and the block is not the "replace block". All conditions
-used in these filters have these semantics. If the "replace" condition is met,
-the block is replaced with either "block 1" or "block 2", depending on the
-coordinates of the block being replaced in order to create the grid fill.
+A lot of filters use a "selector string", which is a way to evaluate whether this
+block is included or not (note it's not just used for replacement, often it's
+used for an auxiliary 'find' block or similar). Details for the selector string
+can be found in [br.py](./br.py)
 
-Another filter is [block coat](./block_coat.py). This filter initially searches
-for every block that meets the "find" condition. Once it has found these blocks,
-it checks every block adjacent to them and replaces every block that meets the
-"replace" condition with the "block". This replacement search is then repeated
-another "depth-1" times until the full coating is applied.
+A simple example is the [grid](./grid.py) filter. This replaces all blocks that
+are selected by the 'replace' selector with either "block 1" or "block 2",
+depending on the coordinates of the block being placed. This creates the grid
+fill, which may only replace some blocks in the selection.
+
+Another filter is [block coat](./block_coat.py). This filter initially selects
+using 'find' selector. From these blocks, it expands to adjacent blocks that are
+selected by the 'replace' selector, and only in directions dictated by 'expand
+to'. The blocks that were expanded-to are replaced by 'block'. This expansion and
+replacement is then repeated another 'depth - 1' times.
 
 ### slightly more advanced usage
 

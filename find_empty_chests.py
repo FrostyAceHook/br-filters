@@ -13,7 +13,7 @@ def perform(level, box, options):
     positions = []
 
     # Iterate the tile entities.
-    for eid, pos, te in br.iterate(level, box, method=br.TES):
+    for eid, pos, te in br.iterate(level, box, br.TES):
         # Check it's a chest. First value is for pre 1.11, second for post.
         if eid not in {"Chest", "minecraft:chest"}:
             continue

@@ -7,7 +7,8 @@ inputs = (
     ("Block:", alphaMaterials.Glowstone),
     ("Replaces the very centre point of the selection with the block above. "
             "Used to quickly find the centre of something (shocking). If any "
-            "dimension is even in length, two blocks are placed.", "label"),
+            "dimension is even in length, two blocks are placed along that "
+            "direction.", "label"),
 )
 
 

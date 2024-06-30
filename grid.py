@@ -2,14 +2,16 @@ import br
 import numpy as np
 from pymclevel import alphaMaterials
 
-displayName = "Gridify 3"
-# i have no idea what gridify 1 was. but ig i better make this gridify 3...
-#  - me, moments before the creation of gridify 3
+displayName = "Gridify 4"
+# FOUR
 
 
 inputs = (
-    ("Replace except?", True),
-    ("Replace:", alphaMaterials.Air),
+    ("NOTE: Uses a selector string for 'replace'.\n"
+            "See `br.py` for the selector string syntax specifics. For simple "
+            "use, just type a block id/name with optional data (i.e. \"stone\" "
+            "for any stone or \"stone:3\" for diorite).", "label"),
+    ("Replace:", "string"),
     ("Block 1:", alphaMaterials.Stone),
     ("Block 2:", alphaMaterials.Cobblestone),
     ("Swap blocks?", False),
@@ -19,8 +21,9 @@ inputs = (
 
 def perform(level, box, options):
     # Get some options.
-    replace = br.from_options(options, "Replace")
-    place = br.from_options(options, "Block", count=2)
+    replace = br.selector("replace", options["Replace:"])
+    bid1, bdata1 = options["Block 1:"].ID, options["Block 1:"].blockData
+    bid2, bdata2 = options["Block 2:"].ID, options["Block 2:"].blockData
     swap = int(options["Swap blocks?"])
 
     # Make true/false alternating in a grid the size of the selection.
@@ -30,8 +33,7 @@ def perform(level, box, options):
 
     # Do the thang. Note this filter is holey, because missing chunks can just be
     # skipped without consequence.
-    for ids, datas, slices in br.iterate(level, box, method=br.SLICES,
-            holey=True):
+    for ids, datas, slices in br.iterate(level, box, br.SLICES, holey=True):
         # Get the block matches (she was a moth to the flame type shit).
         mask = replace.matches(ids, datas)
 
@@ -39,15 +41,18 @@ def perform(level, box, options):
         cur_odd = odd[slices]
 
         # Set each block type.
-        for i, (bid, bdata) in enumerate(place):
-            # Only place on "replace" block and at either odd or even positions.
-            cur_mask = (mask & (cur_odd == i))
 
-            ids[cur_mask] = bid
-            datas[cur_mask] = bdata
+        mask1 = (mask & (cur_odd == 0))
+        ids[mask1] = bid1
+        datas[mask1] = bdata1
+
+        mask2 = (mask & (cur_odd == 1))
+        ids[mask2] = bid2
+        datas[mask2] = bdata2
 
 
     print "Finished gridifying."
     # you ever just wanna eat a shoe.
     # i eat sneakers.
     return
+    # delicious

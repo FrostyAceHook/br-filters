@@ -117,8 +117,7 @@ def get_cache(level, box, strength, vid, vdata):
 
     # Now cache which blocks are non-void.
     neighbourhood = np.empty(br.shape(neighbourhood_box), dtype=bool)
-    for ids, datas, slices in br.iterate(level, neighbourhood_box,
-            method=br.SLICES):
+    for ids, datas, slices in br.iterate(level, neighbourhood_box, br.SLICES):
         # Add the non-void masks.
         neighbourhood[slices] = ((ids != vid) | (datas != vdata))
 

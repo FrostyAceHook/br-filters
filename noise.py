@@ -5,8 +5,11 @@ from pymclevel import alphaMaterials
 displayName = "Noise"
 
 inputs = (
-    ("Replace except?", True),
-    ("Replace:", alphaMaterials.Air),
+    ("NOTE: Uses a selector string for 'replace'.\n"
+            "See `br.py` for the selector string syntax specifics. For simple "
+            "use, just type a block id/name with optional data (i.e. \"stone\" "
+            "for any stone or \"stone:3\" for diorite).", "label"),
+    ("Replace:", "string"),
     ("Block:", alphaMaterials.Stone),
     ("Seed:", 0),
     ("Scale:", (12, 1, 256)),
@@ -53,7 +56,7 @@ def perform(level, box, options):
     value_min = options["Value min:"]
     value_max = options["Value max:"]
 
-    replace = br.from_options(options, "Replace")
+    replace = br.selector("replace", options["Replace:"])
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
     print "Seed: {}".format(seed)

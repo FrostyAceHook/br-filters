@@ -8,19 +8,20 @@ displayName = "Block Bop"
 DIRECTIONS = "+x", " -x", "+z", " -z", "+y", " -y"
 
 inputs = (
+    ("NOTE: Uses a selector string for 'find' and 'replace'.\n"
+            "See `br.py` for the selector string syntax specifics. For simple "
+            "use, just type a block id/name with optional data (i.e. \"stone\" "
+            "for any stone or \"stone:3\" for diorite).", "label"),
     ("Direction:", DIRECTIONS),
     ("Min depth:", (1, 0, 256)),
     ("Max depth:", (1, 0, 256)),
-    ("Find except?", False),
-    ("Find:", alphaMaterials.Air),
-    ("Replace except?", True),
-    ("Replace:", alphaMaterials.Air),
+    ("Find:", "string"),
+    ("Replace:", "string"),
     ("Block:", alphaMaterials.Stone),
-    ("For every \"find\" block in the selection, replace a random number of "
-            "blocks in the given \"direction\"; provided they are the "
-            "\"replace\" block. The number of blocks is a random number between "
-            "the given \"min depth\" and \"max depth\", inclusive of each.",
-            "label"),
+    ("For every 'find' block in the selection, replace a random number of "
+            "blocks in the given 'direction'; provided they are the 'replace' "
+            "block. The number of blocks is a random number between the given "
+            "'min depth' and 'max depth', inclusive of each.", "label"),
 )
 
 
@@ -41,16 +42,15 @@ def perform(level, box, options):
     print "Max depth: {}".format(depth_max)
 
 
-    find = br.from_options(options, "Find")
-    replace = br.from_options(options, "Replace")
-
+    find = br.selector("find", options["Find:"])
+    replace = br.selector("replace", options["Replace:"])
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
     # Get the block mask. This is where the real work is.
     mask = matches(level, box, find, replace, axis, sign, depth_min, depth_max)
 
     # Place the blocks.
-    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+    for ids, datas, slices in br.iterate(level, box, br.SLICES):
         cur_mask = mask[slices]
 
         # Set the blocks.
@@ -79,7 +79,7 @@ def matches(level, box, find, replace, axis, sign, depth_min, depth_max):
 
 
     # Find the masks for the whole selection.
-    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+    for ids, datas, slices in br.iterate(level, box, br.SLICES):
         find_mask[slices] = find.matches(ids, datas)
         replace_mask[slices] = replace.matches(ids, datas)
 

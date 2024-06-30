@@ -115,7 +115,7 @@ NAMES = {eid: name for name, eids in ALL_IDS for eid in eids}
 # to only `block_ids` and `entity_ids`. The position is in xyz order.
 def storages(level, box, block_ids, entity_ids):
     # Find the items in the blocks.
-    for eid, pos, te in br.iterate(level, box, method=br.TES):
+    for eid, pos, te in br.iterate(level, box, br.TES):
         # Gotta be a storage that's getting checked.
         if eid not in block_ids:
             continue
@@ -130,7 +130,7 @@ def storages(level, box, block_ids, entity_ids):
 
 
     # Find the items in the entities.
-    for eid, pos, entity in br.iterate(level, box, method=br.ENTITIES):
+    for eid, pos, entity in br.iterate(level, box, br.ENTITIES):
         # Gotta be a storage that's getting checked.
         if eid not in entity_ids:
             continue
