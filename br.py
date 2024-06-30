@@ -163,11 +163,36 @@ def shift(array, by, axis, clamp=False, out=None):
     return out
 
 
+# Same as `shift` however instead of only shifting along a single axis, shifts
+# along all three axes by their respective `<axis>_by` slots.
+def shift_xyz(array, x_by, y_by, z_by, clamp=False, out=None):
+    if out is None and (x_by or y_by or z_by):
+        out = np.copy(array)
+
+    shift(array, x_by, AXIS_X, clamp=clamp, out=out)
+    shift(out, y_by, AXIS_Y, clamp=clamp, out=out)
+    shift(out, z_by, AXIS_Z, clamp=clamp, out=out)
+    return out
+
+
 
 # Returns the slices that would index `slice(start, end, step)` along the given
 # axis, and then every element along the others.
 def slices(axis, start, end, step=None):
     return axis*(slice(None),) + (slice(start, end, step),)
+
+
+# Returns the shape of the box, in x,z,y order.
+def shape(box):
+    # Cheeky unpack, reorder and repack.
+    w, h, l = box.size
+    return w, l, h
+
+
+# Returns the slices of the box, in x,z,y order.
+def box_slices(box):
+    x, y, z = [slice(p1, p2) for p1, p2 in zip(box.origin, box.maximum)]
+    return x, z, y
 
 
 
@@ -256,141 +281,3 @@ def from_options(options, prefix, count=1):
         datas.append(block.blockData)
 
     return Blocks(ids, datas, is_except)
-
-
-
-# Returns the shape of the box, in x,z,y order.
-def shape(box):
-    # Cheeky unpack, reorder and repack.
-    w, h, l = box.size
-    return w, l, h
-
-
-# Returns the slices of the box, in x,z,y order.
-def box_slices(box):
-    x, y, z = [slice(p1, p2) for p1, p2 in zip(box.origin, box.maximum)]
-    return x, z, y
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# LMAO. i am leaving this here as a relic. you see, once upon a time i wished to
-# improve upon the progress readout from br-filters 1. so i made a cool little
-# progress bar, spent a couple (more) hours tryna perfect it, make it threaded,
-# ya know. However. it is after completing the rework of the smooth filter that i
-# stand here, high among the stars, and realise the world i left behind. you see,
-# i did not realise my journey of filter improvement would lead me to such
-# places. It has gotten to the point that every single filter has been sped up by
-# such a degree that it can genuinely be considered instaneous (<0.1 seconds).
-# And what does this mean for our measily little progress readout? Well, it's
-# completely, entirely, utterly useless. Goodbye progress readout, you will be
-# missed.
-
-
-
-# Prints the progress of an iterable as a progress bar.
-def __progress(title, iterable, total=None):
-    if total is None:
-        total = len(iterable)
-
-    start = time.time()
-
-    # Store the previous line length to fully wipe it.
-    prev_len = 0
-
-    # Only update the printer every so often to prevent needless printing. Use a
-    # pow2-1 with logical & for speedy triggering once every few.
-    check = prev_pow2(total // 100) - 1
-
-    # Don't do something dumb.
-    if check < 0:
-        check = 0
-
-    for i, item in enumerate(iterable):
-        if not (i & check):
-            # Get how done.
-            how_done = float(i) / float(total)
-            how_done = np.clip(how_done, 0.0, 1.0) # justin caseme.
-
-            # Get the line to print, and update the previous line length.
-            line, prev_len = get_line(title, start, how_done, prev_len)
-            stdout.write(line)
-            stdout.flush()
-
-        yield item
-
-    # We done so print hundy. Also chuck a newline in there.
-    line, _ = get_line(title, start, 1.0, prev_len)
-    stdout.write(line + "\n")
-    stdout.flush()
-
-
-    # ive tried threading this printing but its literally slower because of the
-    # stoopid gil. dumbest thing i ever saw. anyway i also cant use multiprocess
-    # because i think an issue with tkinter/mcedit/windows causes it to launch a
-    # new mcedit window LITERALLY NO MATTER WHAT I DO. HOW DOES IT NOT REALISE
-    # THAT MORE MCEDITS WILL NOT MCEDIT FASTER. anyway so here we are with this
-    # single-threaded non-async chugging-along monstrosity. but the other thing
-    # is that python is actually just ridiculously slow, and more than half the
-    # slowdown of the printer is caused literally just from:
-    # def func(iterable):
-    #   for x in iterable: yeild x
-    # so yeah no threading will speed that up.
-    # but also it doenst make a measurable difference on intense filters which
-    # actually benefit from it, so ya know kinda pointless anyway. but still
-    # annoying af.
-
-
-
-def __get_line(title, start, how_done, prev_len):
-    # Total width of the progress bar.
-    NUM_TICKS = 20
-
-    # Store how much time its taken so far.
-    taken = time.time() - start
-
-    # Get the number of full ticks to display and do the actual progress bar.
-    ticks = int(round(how_done * NUM_TICKS))
-    bar = "=" * ticks + "-" * (NUM_TICKS - ticks)
-
-
-    if how_done < 1.0:
-        # Get the time estimate left. This is probably a really naive way to
-        # do it, which is exactly why thats how im doing it.
-        if how_done > 0.0:
-            taketh = taken / how_done - taken
-        else:
-            # dont div by zero idot.
-            taketh = 99.9
-
-        # im gonna call him... timey (i cant spell).
-        timey = "[~{:.1f}s left]".format(taketh)
-    else:
-        # If we done, jsut display how long it took.
-        timey = "[took {:.1f}s]".format(taken)
-
-
-    # Put the line together, wiping the previous line with '\r'.
-    line = "\r{}: {} {}% {}".format(title, bar, int(100*how_done), timey)
-
-    # Gotta ensure all characters from the previous line are overwritten, so
-    # pad with spaces.
-    this_len = len(line)
-    line = line + " "*max(prev_len - this_len, 0)
-
-    return line, this_len
