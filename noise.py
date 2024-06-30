@@ -9,16 +9,22 @@ inputs = (
     ("Replace:", alphaMaterials.Air),
     ("Block:", alphaMaterials.Stone),
     ("Seed:", 0),
-    ("Scale:", (6, 1, 256)),
+    ("Scale:", (12, 1, 256)),
     ("Octaves:", (2, 1, 20)),
-    ("Proportion:", (0.4, 0.0, 1.0)),
-    ("Scale controls the general size of the fluctations, octaves increase the "
-            "chaos, proportion is roughly the percentage of blocks replaced. "
-            "If the seed is zero, uses a random seed.", "label"),
-    ("Visualise:", False),
-    ("just a cool option that replaces the entire selection with wool based on "
-            "the noise generated from the given \"scale\" and \"octaves\" (red "
-            "= 0.0, purple = 1.0).", "label"),
+    ("If seed is non-zero, it can be used to produce the same noise when paired "
+            "with the same selection size. Scale controls the general size of "
+            "the fluctations. Octaves increase the chaos of the noise. Smooth "
+            "reduces the chaos of the noise.", "label"),
+    ("Value min:", (0.0, 0.0, 1.0)),
+    ("Value max:", (0.4, 0.0, 1.0)),
+    ("Essentially, the noise just assigns all blocks a random value between 0 "
+            "and 1, and then any 'replace' blocks which have a value between "
+            "'value min' and 'value max' get replaced. So:"
+            "\n- ('value max' - 'value min') is roughly the proportion of "
+                "blocks that will be replaced."
+            "\n- for swirly noise, centre min and max around 0.5."
+            "\n- for clumpy noise, keep min close to 0 (or max close to 1).",
+            "label"),
 )
 
 
@@ -33,44 +39,48 @@ inputs = (
 
 
 def perform(level, box, options):
+    visualise = False # turn on for cool noise visualisation.
+
     # Get my seed.
     seed = options["Seed:"]
     if seed == 0:
-        np.random.seed()
-    else:
-        np.random.seed(seed)
+        np.random.seed() # need a random seed to generate a random seed.
+        seed = np.random.randint(1, 10**9)
 
     # Get those options.
     scale = options["Scale:"]
     octaves = options["Octaves:"]
-    proportion = options["Proportion:"]
-    visualise = options["Visualise:"]
+    value_min = options["Value min:"]
+    value_max = options["Value max:"]
+
+    replace = br.from_options(options, "Replace")
+    bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
     print "Seed: {}".format(seed)
     print "Scale: {}".format(scale)
     print "Octaves: {}".format(octaves)
     if not visualise:
-        print "Proportion: {}".format(proportion)
+        print "Value min: {}".format(value_min)
+        print "Value max: {}".format(value_max)
     else:
         print "Acsending (visualising)"
 
-    bid, bdata = options["Block:"].ID, options["Block:"].blockData
+    # Seed this thing.
+    np.random.seed(seed)
 
-    replace = br.from_options(options, "Replace")
 
     # LETS MAAAAAKE SOOOME NOOOOOOOOOISE
     noise = stuartian_noise(br.shape(box), scale, octaves)
 
 
     if not visualise:
-        # Place on the blocks where the noise is less than the proportion,
-        # effectively placing about `proportion` blocks.
-        mask = (noise <= proportion)
+        # Place on the blocks where the noise values are within the specified
+        # range.
+        mask = ((value_min <= noise) & (noise <= value_max))
 
         # Iterate the blocks, in a holey manner because it's ok to just skip
         # missing chunks.
-        for ids, datas, slices in br.iterate(level, box, method=br.SLICES,
-                holey=True):
+        for ids, datas, slices in br.iterate(level, box, br.SLICES, holey=True):
             # Line up the matches and the mask.
             cur_mask = (replace.matches(ids, datas) & mask[slices])
 
@@ -86,9 +96,6 @@ def perform(level, box, options):
         # Convert from the floating value to a value from 0 to len-1.
         noise *= len(rainbow) - 1
 
-        # Clip justin caseme, to not make any corrupt data.
-        noise = np.clip(noise, 0, len(rainbow) - 1)
-
         wools = noise.astype(np.uint8)
 
         # Convert from the indices to the wool data values.
@@ -97,8 +104,7 @@ def perform(level, box, options):
         wools -= 16
 
         # Taste the rainbow bitch.
-        for ids, datas, slices in br.iterate(level, box, method=br.SLICES,
-                holey=True):
+        for ids, datas, slices in br.iterate(level, box, br.SLICES, holey=True):
             ids[:] = 35 # wool id.
             datas[:] = wools[slices]
 
@@ -139,8 +145,7 @@ def stuartian_noise(shape, scale, octaves):
 
     # Correct the values of the noise, which shifts the distribution such that
     # it's roughly a uniform distribution. Currently, it's very centre-focussed
-    # so this just spreads it towards the edges of 0 and 1. Also clips it from
-    # 0..1 but i don't think that's 100% necessary.
+    # so this just spreads it towards the edges of 0 and 1.
     noise = correct(noise, scale)
 
 
@@ -158,6 +163,9 @@ def stuartian_noise(shape, scale, octaves):
             # Scale back to [0,1].
             noise /= (1 + impact)
 
+    # Clip justin caseme.
+    noise.clip(0.0, 1.0, out=noise)
+
     # Too easy.
     return noise
 
@@ -165,6 +173,7 @@ def stuartian_noise(shape, scale, octaves):
 
 def lerp(data, axis, scale):
     # Note: don't go here w scale=1.
+    assert scale > 1
 
     # Algorithm: repeat the data along the array in the positive direction until
     # the node, multiply that all by some weight array which scales it correctly.
@@ -220,8 +229,8 @@ def correct(noise, scale):
     # the noise is literally a uniform distribution (the nodes). So, mix in a bit
     # of the uncorrected noise to essentially reduce the smoothness of the smooth
     # function.
-    return (noise + (scale**2.2 - 1) * s) / scale**2.2
-
+    scale_2_2 = scale ** 2.2
+    return (noise + (scale_2_2 - 1) * s) / scale_2_2
 
     # bunch of really rough scribbling/working if u wanna cop a geez.
     # https://www.desmos.com/calculator/yk9j6orqpg
