@@ -25,7 +25,6 @@ inputs = (
 )
 
 
-
 def perform(level, box, options):
     replace = br.selector("replace", options["Replace:"])
 

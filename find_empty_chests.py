@@ -8,6 +8,7 @@ inputs = (
     ("Check the console for the results.", "label"),
 )
 
+
 def perform(level, box, options):
     # Store all coordinates of empty chests.
     positions = []

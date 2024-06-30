@@ -23,7 +23,7 @@ selection, changing each block if it meets certain conditions.
 A lot of filters use a "selector string", which is a way to evaluate whether this
 block is included or not (note it's not just used for replacement, often it's
 used for an auxiliary 'find' block or similar). Details for the selector string
-can be found in [br.py](./br.py)
+can be found in [br.py](./br.py).
 
 A simple example is the [grid](./grid.py) filter. This replaces all blocks that
 are selected by the 'replace' selector with either "block 1" or "block 2",

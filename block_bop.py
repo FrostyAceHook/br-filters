@@ -12,12 +12,12 @@ inputs = (
             "See `br.py` for the selector string syntax specifics. For simple "
             "use, just type a block id/name with optional data (i.e. \"stone\" "
             "for any stone or \"stone:3\" for diorite).", "label"),
-    ("Direction:", DIRECTIONS),
-    ("Min depth:", (1, 0, 256)),
-    ("Max depth:", (1, 0, 256)),
     ("Find:", "string"),
     ("Replace:", "string"),
     ("Block:", alphaMaterials.Stone),
+    ("Direction:", DIRECTIONS),
+    ("Min depth:", (1, 0, 256)),
+    ("Max depth:", (1, 0, 256)),
     ("For every 'find' block in the selection, replace a random number of "
             "blocks in the given 'direction'; provided they are the 'replace' "
             "block. The number of blocks is a random number between the given "

@@ -11,18 +11,21 @@ displayName = "Find"
 # Create the maps from name to the possible ids. The ids are for pre/post 1.11.
 
 BLOCK_IDS = OrderedDict([
-    ("chest", {"Chest", "minecraft:chest"}),
-    ("furnace", {"Furnace", "minecraft:furnace"}),
-    ("dispenser", {"Trap", "minecraft:dispenser"}),
-    ("dropper", {"Dropper", "minecraft:dropper"}),
-    ("hopper", {"Hopper", "minecraft:hopper"}),
-    ("brewing stand", {"Cauldron", "minecraft:brewing_stand"}), # ??? y cauldron
+    ("chest", {"Chest", "chest", "minecraft:chest"}),
+    ("furnace", {"Furnace", "furnace", "minecraft:furnace"}),
+    ("dispenser", {"Trap", "dispenser", "minecraft:dispenser"}),
+    ("dropper", {"Dropper", "dropper", "minecraft:dropper"}),
+    ("hopper", {"Hopper", "hopper", "minecraft:hopper"}),
+    ("brewing stand", {"Cauldron", "brewing_stand", "minecraft:brewing_stand"}),
+                        # ??? y cauldron
 ])
 
 ENTITY_IDS = OrderedDict([
-    ("item frame", {"ItemFrame", "minecraft:item_frame"}),
-    ("minecart chest", {"MinecartChest", "minecraft:chest_minecart"}),
-    ("minecart hopper", {"MinecartHopper", "minecraft:hopper_minecart"}),
+    ("item frame", {"ItemFrame", "item_frame", "minecraft:item_frame"}),
+    ("minecart chest", {"MinecartChest", "chest_minecart",
+            "minecraft:chest_minecart"}),
+    ("minecart hopper", {"MinecartHopper", "hopper_minecart",
+            "minecraft:hopper_minecart"}),
 ])
 
 # Pluralise and add a colon.
@@ -44,6 +47,7 @@ inputs += tuple((to_option(name), True) for name in chain(BLOCK_IDS, ENTITY_IDS)
 inputs += ("Note that trapped chest are not distinguished from regular chests "
         "(to emulate gameplay of course (actually bc they use the same tile "
         "entity)).", "label"),
+
 
 def perform(level, box, options):
     find = prefix(options["Item id:"]), options["Item data:"]
@@ -98,7 +102,7 @@ def perform(level, box, options):
     # Print total count.
     if total_count > 0:
         print "Found {} total, across {} storage{}.".format(total_count,
-                storage_count, "s" if storage_count != 1 else "")
+                storage_count, "" if storage_count == 1 else "s")
     else:
         print "Not found."
 

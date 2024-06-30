@@ -1,4 +1,3 @@
-import time
 import numpy as np
 from pymclevel import TileEntity, Entity
 
@@ -16,10 +15,10 @@ from pymclevel import TileEntity, Entity
 #
 # Form: simple :D
 # selector = ["!"] id [":" data]
-# - "!" inverts the selection
+# - "!" inverts the selection.
 # - `id` is the block id (may be a word which is looked-up to an integer).
 # - `data` is the block data (may be a word which is looked-up to an integer).
-#       If no `data` is given, any data type matches.
+# - If no `data` is given, any data type matches.
 #
 #
 # Form: complex >:(
