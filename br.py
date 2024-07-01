@@ -1116,7 +1116,7 @@ BIOME_NAMEOF = {v: k for k, v in BIOME_IDOF.items()}
 
 
 # Tuple of all biome nice-names.
-BIOME_NAMES = tuple(BIOME_IDS.keys())
+BIOME_NAMES = tuple(BIOME_IDOF.keys())
 
 
 # Returns a string of the given biome id.
