@@ -1,5 +1,4 @@
 import br
-from pymclevel import TileEntity
 
 displayName = "Find empty chests"
 

@@ -2,7 +2,6 @@ import br
 from itertools import chain
 from collections import OrderedDict
 from math import floor
-from pymclevel import TileEntity, Entity
 
 displayName = "Find"
 
@@ -10,7 +9,7 @@ displayName = "Find"
 
 # Create the maps from name to the possible ids. The ids are for pre/post 1.11.
 
-BLOCK_IDS = OrderedDict([
+TILE_IDS = OrderedDict([
     ("chest", {"Chest", "chest", "minecraft:chest"}),
     ("furnace", {"Furnace", "furnace", "minecraft:furnace"}),
     ("dispenser", {"Trap", "dispenser", "minecraft:dispenser"}),
@@ -42,11 +41,13 @@ inputs = (
     ("Find in ...", "label"),
 )
 # Add the container options.
-inputs += tuple((to_option(name), True) for name in chain(BLOCK_IDS, ENTITY_IDS))
+inputs += tuple((to_option(name), True) for name in chain(TILE_IDS, ENTITY_IDS))
 # Let em know about the trapped chests.
-inputs += ("Note that trapped chest are not distinguished from regular chests "
-        "(to emulate gameplay of course (actually bc they use the same tile "
-        "entity)).", "label"),
+inputs += (
+    ("Note that trapped chest are not distinguished from regular chests (to "
+            "emulate gameplay of course (actually bc they use the same tile "
+            "entity)).", "label"),
+)
 
 
 def perform(level, box, options):
@@ -57,10 +58,10 @@ def perform(level, box, options):
 
 
     # Setup which storages to check.
-    block_ids = set()
-    for name in BLOCK_IDS:
+    tile_ids = set()
+    for name in TILE_IDS:
         if options[to_option(name)]:
-            block_ids |= BLOCK_IDS[name]
+            tile_ids |= TILE_IDS[name]
 
     entity_ids = set()
     for name in ENTITY_IDS:
@@ -73,7 +74,7 @@ def perform(level, box, options):
     storage_count = 0
 
     # Iterate through the storages, printing when something is found.
-    for name, pos, items in storages(level, box, block_ids, entity_ids):
+    for name, pos, items in storages(level, box, tile_ids, entity_ids):
         # Count how many items match.
         count = 0
         for item in items:
@@ -101,7 +102,7 @@ def perform(level, box, options):
 
     # Print total count.
     if total_count > 0:
-        print "Found {} total, across {} storage{}.".format(total_count,
+        print "Found {} in total, across {} storage{}.".format(total_count,
                 storage_count, "" if storage_count == 1 else "s")
     else:
         print "Not found."
@@ -111,21 +112,21 @@ def perform(level, box, options):
 
 
 # Make an id to name map.
-ALL_IDS = chain(BLOCK_IDS.items(), ENTITY_IDS.items())
+ALL_IDS = chain(TILE_IDS.items(), ENTITY_IDS.items())
 NAMES = {eid: name for name, eids in ALL_IDS for eid in eids}
 
 
 # Yeilds the name, position and items of every storage in the selection, filtered
-# to only `block_ids` and `entity_ids`. The position is in xyz order.
-def storages(level, box, block_ids, entity_ids):
+# to only `tile_ids` and `entity_ids`. The position is in xyz order.
+def storages(level, box, tile_ids, entity_ids):
     # Find the items in the blocks.
     for teid, pos, te in br.iterate(level, box, br.TES):
         # Gotta be a storage that's getting checked.
-        if teid not in block_ids:
+        if teid not in tile_ids:
             continue
 
         # Gotta have items dunnit. This is basically just to skip malformed tile
-        # entities,
+        # entities.
         if "Items" not in te:
             continue
 
@@ -138,7 +139,6 @@ def storages(level, box, block_ids, entity_ids):
         # Gotta be a storage that's getting checked.
         if eid not in entity_ids:
             continue
-
 
         # Item frame stores it differently :c.
         if eid in ENTITY_IDS["item frame"]:
@@ -155,8 +155,8 @@ def storages(level, box, block_ids, entity_ids):
                 continue
             items = entity["Items"]
 
-
-        # Just return the block position. Use floor to match up w minecraft.
+        # Just return the block position instead of the precise floating pos.
+        # Use floor to match up w minecraft.
         ipos = tuple(int(floor(x)) for x in pos)
 
         yield NAMES[eid], ipos, items
