@@ -623,7 +623,7 @@ def op_create(level, box, options):
     all_slices = []
     all_tes = []
 
-    for ids, datas, slices in br.iterate(level, box, br.SLICES):
+    for ids, datas, slices in br.iterate(level, box, br.BLOCKS):
         all_ids.append(ids)
         all_datas.append(datas)
         all_slices.append(slices)

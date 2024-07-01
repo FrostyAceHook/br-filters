@@ -83,7 +83,7 @@ def perform(level, box, options):
 
         # Iterate the blocks, in a holey manner because it's ok to just skip
         # missing chunks.
-        for ids, datas, slices in br.iterate(level, box, br.SLICES, holey=True):
+        for ids, datas, slices in br.iterate(level, box, br.BLOCKS, holey=True):
             # Line up the matches and the mask.
             cur_mask = (replace.matches(ids, datas) & mask[slices])
 
@@ -107,7 +107,7 @@ def perform(level, box, options):
         wools -= 16
 
         # Taste the rainbow bitch.
-        for ids, datas, slices in br.iterate(level, box, br.SLICES, holey=True):
+        for ids, datas, slices in br.iterate(level, box, br.BLOCKS, holey=True):
             ids[:] = 35 # wool id.
             datas[:] = wools[slices]
 

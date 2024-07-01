@@ -50,7 +50,7 @@ def perform(level, box, options):
     mask = matches(level, box, find, replace, axis, sign, depth_min, depth_max)
 
     # Place the blocks.
-    for ids, datas, slices in br.iterate(level, box, br.SLICES):
+    for ids, datas, slices in br.iterate(level, box, br.BLOCKS):
         cur_mask = mask[slices]
 
         # Set the blocks.
@@ -79,7 +79,7 @@ def matches(level, box, find, replace, axis, sign, depth_min, depth_max):
 
 
     # Find the masks for the whole selection.
-    for ids, datas, slices in br.iterate(level, box, br.SLICES):
+    for ids, datas, slices in br.iterate(level, box, br.BLOCKS):
         find_mask[slices] = find.matches(ids, datas)
         replace_mask[slices] = replace.matches(ids, datas)
 

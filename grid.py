@@ -33,7 +33,7 @@ def perform(level, box, options):
 
     # Do the thang. Note this filter is holey, because missing chunks can just be
     # skipped without consequence.
-    for ids, datas, slices in br.iterate(level, box, br.SLICES, holey=True):
+    for ids, datas, slices in br.iterate(level, box, br.BLOCKS, holey=True):
         # Get the block matches (she was a moth to the flame type shit).
         mask = replace.matches(ids, datas)
 

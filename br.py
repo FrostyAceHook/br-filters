@@ -1,4 +1,5 @@
 import numpy as np
+from collections import OrderedDict
 from pymclevel import TileEntity, Entity
 
 
@@ -912,23 +913,45 @@ class Sel:
 
 
 
+# Default returns from `getChunkSlices`.
+#  `chunk, slices, point`
+# - `chunk` is the chunk.
+# - `slices` is the slice tuple for the block arrays of chunk.
+# - `point` is the current offset within the selection (i think i forgor).
+DEFAULT = 0
 
-BLOCKS = 0 # Iterate through the blocks.
-SLICES = 1 # Iterate through the blocks and slices of the selection.
-CHUNKS = 2 # Iterate through the chunks.
-TES = 3 # Iterate through the tile entities.
-ENTITIES = 4 # Iterate through the entities.
+# Iterate through the block ids and datas of the selection.
+#  `ids, datas, slices`
+# - `ids` is a view of this chunk's selected blocks' ids. xzy order.
+# - `datas` is a view of this chunk's selected blocks' datas. xzy order.
+# - `slices` is the indexer of an array the size of the box for this iteration.
+BLOCKS = 1
+
+# Iterate through the biomes of the selection.
+#  `biomes, slices`
+# - `biomes` is a view of this chunk's selected biomes. xz order.
+# - `slices` is the indexer of an array with the width and length of the box for
+#       this iteration.
+BIOMES = 2
+
+# Iterate through the tile entities of the selection.
+#  `teid, pos, te`
+# - `teid` is the string tile entity id.
+# - `pos` is the integer tile entity position. xyz order.
+# - `te` is the tile entity.
+TES = 3
+
+# Iterate through the entities of the selection.
+#  `eid, pos, entity`
+# - `eid` is the string entity id.
+# - `pos` is the floating entity (dun dun dun) position. xyz order.
+# - `entity` is the entity (dun dun dun).
+ENTITIES = 4
+
 
 # Iterates through the selection of the level. The `method` argument determines
-# the format of the yielded values. The yielded values are as follows:
-# - BLOCKS: `ids` and `datas` in the selection, in x,z,y order.
-# - SLICES: `ids` and `datas`, as well as a `slices` mask which represents the
-#           current section of the overall selection, all in x,z,y order.
-# - CHUNKS: every `chunk` in selection.
-# - TES: every tile entity in selection, as the tile entity id (`eid`), position
-#        in x,y,z order (`pos`), and the compound itself (`te`).
-# - ENTITIES: every entity in selection, as the entity id (`eid`), position in
-#        x,y,z order (`pos`), and the compound itself (`entity`).
+# the format of the yielded values. If `holey` is true, missing chunks will be
+# skipped instead of throwing.
 def iterate(level, box, method, holey=False):
     # fucking finally found the culprit of the chunk skipping bug. i believe the
     # chunks were being unloaded before the changes could be made/saved/
@@ -961,10 +984,11 @@ def iterate(level, box, method, holey=False):
 
     # Iterate through the level selection.
     for chunk, slices, point in level.getChunkSlices(box):
-        # If the method is chunks, just yield the chunk.
-        if method == CHUNKS:
-            yield chunk
+        # trivial. hardly a challenge.
+        if method == DEFAULT:
+            yield chunk, slices, point
             continue
+
 
         # Entities and tile entites have a very similar api.
         if method == TES or method == ENTITIES:
@@ -984,22 +1008,125 @@ def iterate(level, box, method, holey=False):
             continue
 
 
-        # The other methods all return the ids and datas.
-        ids = chunk.Blocks[slices]
-        datas = chunk.Data[slices]
-
-        if method == BLOCKS:
-            yield ids, datas
-            continue
-
-        # Get the properties of the current slice.
+        # Get the current slice of the box.
         pos = [point[i] for i in (0,2,1)]
         size = [s.stop - s.start for s in slices]
-
-        # Make into slices for the overall selection.
         sel_slices = tuple(slice(p, p + s) for p, s in zip(pos, size))
-        yield ids, datas, sel_slices
-        continue
+
+
+        # Blocks pretty easy.
+        if method == BLOCKS:
+            # Jus gotta index.
+            yield chunk.Blocks[slices], chunk.Data[slices], sel_slices
+            continue
+
+
+        # If biomes, get the biome array.
+        if method == BIOMES:
+            # .Biomes reshapes the biome array from 256,1 to 16,16 but it doesnt
+            # update it to maintain the same order blocks/datas?? but uh we will
+            # do that.
+            biomes = chunk.Biomes
+            # Flip from [z,x] to [x,z].
+            biomes = biomes.T
+            # Only in-selection.
+            biomes = biomes[slices[:2]] # ignore y slice.
+
+            # Now yield with the xz sel slices also.
+            yield biomes, (sel_slices[0], sel_slices[1])
+            continue
+
+
+        # unreachable.
+        raise Exception("dujj")
+
+
+
+
+# Map of biome nice-names to their ids. Note these are not valid for all
+# versions.
+BIOME_IDOF = OrderedDict([
+    ("Beach", 16),
+    ("Birch Forest", 27),
+    ("Birch Forest M", 155),
+    ("Birch Forest Hills", 28),
+    ("Birch Forest Hills M", 156),
+    ("Cold Beach", 26),
+    ("Cold Taiga", 30),
+    ("Cold Taiga M", 158),
+    ("Cold Taiga Hills", 31),
+    ("Deep Ocean", 24),
+    ("Desert", 2),
+    ("Desert M", 130),
+    ("Desert Hills", 17),
+    ("End", 9),
+    ("Extreme Hills", 3),
+    ("Extreme Hills M", 131),
+    ("Extreme Hills Edge", 20),
+    ("Extreme Hills+", 34),
+    ("Extreme Hills+ M", 162),
+    ("Flower Forest", 132),
+    ("Forest", 4),
+    ("Forest Hills", 18),
+    ("Frozen Ocean", 10),
+    ("Frozen River", 11),
+    ("Ice Mountains", 13),
+    ("Ice Plains", 12),
+    ("Ice Plains Spikes", 140),
+    ("Jungle", 21),
+    ("Jungle M", 149),
+    ("Jungle Edge", 23),
+    ("Jungle Edge M", 151),
+    ("Jungle Hills", 22),
+    ("Mega Spruce Taiga", 160),
+    ("Mega Taiga", 32),
+    ("Mega Taiga Hills", 33),
+    ("Mesa", 37),
+    ("Mesa M", 165),
+    ("Mesa Plateau", 39),
+    ("Mesa Plateau M", 167),
+    ("Mesa Plateau F", 38),
+    ("Mesa Plateau F M", 166),
+    ("Mushroom Island", 14),
+    ("Mushroom Island Shore", 15),
+    ("Nether", 8),
+    ("Ocean", 0),
+    ("Plains", 1),
+    ("Redwood Taiga Hills M", 161),
+    ("River", 7),
+    ("Roofed Forest", 29),
+    ("Roofed Forest M", 157),
+    ("Savanna", 35),
+    ("Savanna M", 163),
+    ("Savanna Plateau", 36),
+    ("Savanna Plateau M", 164),
+    ("Stone Beach", 25),
+    ("Sunflower Plains", 129),
+    ("Swampland", 6),
+    ("Swampland M", 134),
+    ("Taiga", 5),
+    ("Taiga M", 133),
+    ("Taiga Hills", 19),
+    ("Void", 127),
+])
+
+
+# Map of biome ids to their nice-names.
+BIOME_NAMEOF = {v: k for k, v in BIOME_IDOF.items()}
+
+
+# Tuple of all biome nice-names.
+BIOME_NAMES = tuple(BIOME_IDS.keys())
+
+
+# Returns a string of the given biome id.
+def biome_str(biome_id):
+    # If it's a recognised id, return its nice-name.
+    if biome_id in BIOME_NAMEOF:
+        return "\"{}\" ({})".format(BIOME_NAMEOF[biome_id], biome_id)
+    else:
+        return str(biome_id)
+
 
 
 

@@ -41,7 +41,7 @@ def perform(level, box, options):
     non_void = smooth(cache, box, strength)
 
     # Copy to level.
-    for ids, datas, slices in br.iterate(level, box, method=br.SLICES):
+    for ids, datas, slices in br.iterate(level, box, br.BLOCKS):
         # Get the non-void mask of this slice.
         nv = non_void[slices]
 
@@ -117,7 +117,7 @@ def get_cache(level, box, strength, vid, vdata):
 
     # Now cache which blocks are non-void.
     neighbourhood = np.empty(br.shape(neighbourhood_box), dtype=bool)
-    for ids, datas, slices in br.iterate(level, neighbourhood_box, br.SLICES):
+    for ids, datas, slices in br.iterate(level, neighbourhood_box, br.BLOCKS):
         # Add the non-void masks.
         neighbourhood[slices] = ((ids != vid) | (datas != vdata))
 

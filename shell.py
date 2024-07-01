@@ -18,7 +18,7 @@ def perform(level, box, options):
     mask = get_mask(box)
 
     # Place em (holey style).
-    for ids, datas, slices in br.iterate(level, box, br.SLICES, holey=True):
+    for ids, datas, slices in br.iterate(level, box, br.BLOCKS, holey=True):
         cur_mask = mask[slices]
 
         ids[cur_mask] = bid
