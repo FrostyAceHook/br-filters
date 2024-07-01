@@ -1130,7 +1130,6 @@ def biome_str(biome_id):
 
 
 
-
 AXIS_X = 0 # Typically x-axis.
 AXIS_Z = 1 # Typically z-axis.
 AXIS_Y = 2 # Typically y-axis.
@@ -1203,12 +1202,9 @@ def shift(array, by, axis, clamp=False, out=None):
 # Same as `shift` however instead of only shifting along a single axis, shifts
 # along all three axes by their respective `<axis>_by` slots.
 def shift_xyz(array, x_by, y_by, z_by, clamp=False, out=None):
-    if out is None and (x_by or y_by or z_by):
-        out = np.copy(array)
-
-    shift(array, x_by, AXIS_X, clamp=clamp, out=out)
-    shift(out, y_by, AXIS_Y, clamp=clamp, out=out)
-    shift(out, z_by, AXIS_Z, clamp=clamp, out=out)
+    out = shift(array, x_by, AXIS_X, clamp=clamp, out=out)
+    out = shift(out, y_by, AXIS_Y, clamp=clamp, out=out)
+    out = shift(out, z_by, AXIS_Z, clamp=clamp, out=out)
     return out
 
 
