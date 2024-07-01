@@ -72,8 +72,8 @@ def perform(level, box, options):
 
     # Go through all the chests in selection.
     count = 0
-    for eid, pos, te in br.iterate(level, box, br.TES):
-        if eid not in {"Chest", "chest", "minecraft:chest"}:
+    for teid, pos, te in br.iterate(level, box, br.TES):
+        if teid not in {"Chest", "chest", "minecraft:chest"}:
             continue
 
         # Handle non-empty chests.

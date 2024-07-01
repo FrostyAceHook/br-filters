@@ -119,9 +119,9 @@ NAMES = {eid: name for name, eids in ALL_IDS for eid in eids}
 # to only `block_ids` and `entity_ids`. The position is in xyz order.
 def storages(level, box, block_ids, entity_ids):
     # Find the items in the blocks.
-    for eid, pos, te in br.iterate(level, box, br.TES):
+    for teid, pos, te in br.iterate(level, box, br.TES):
         # Gotta be a storage that's getting checked.
-        if eid not in block_ids:
+        if teid not in block_ids:
             continue
 
         # Gotta have items dunnit. This is basically just to skip malformed tile
@@ -130,7 +130,7 @@ def storages(level, box, block_ids, entity_ids):
             continue
 
         # Same item api for all (supported) storage types.
-        yield NAMES[eid], pos, te["Items"]
+        yield NAMES[teid], pos, te["Items"]
 
 
     # Find the items in the entities.
