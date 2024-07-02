@@ -5,15 +5,10 @@ from pymclevel import alphaMaterials, BoundingBox
 displayName = "Smoother (brain)"
 
 inputs = (
-    ("Strength:", (3, 1, 20)),
-    ("Void:", alphaMaterials.Air),
-    ("Fill:", alphaMaterials.Stone),
-    ("Replaces the selection with a smoothed version of the blocks. The filter "
-            "analyses the selection as if it only contains two block types, "
-            "\"void\" and not void. It then smoothes this hypothetical terrain "
-            "and pastes it back into the level, filling any not void with "
-            "\"fill\".", "label"),
-    ("IT WILL DESTROY ANY BLOCK TYPE VARIATION", "label"),
+    ("Replaces the selection with a smoothed version of the blocks. Within and "
+            "up-to 'strength' blocks outside of the selection, there must be at-"
+            "most two different blocks.", "label"),
+    ("Strength:", (3, 1, 15)),
 )
 
 
@@ -30,12 +25,17 @@ def perform(level, box, options):
 
     print "Strength: {}".format(strength)
 
-    # Get the void and fill blocks.
-    vid, vdata = options["Void:"].ID, options["Void:"].blockData
-    fid, fdata = options["Fill:"].ID, options["Fill:"].blockData
+    # Copy the selection blocks + surrounding blocks to a cache.
+    cache, blocks = get_cache(level, box, strength)
 
-    # Cache the selection.
-    cache = get_cache(level, box, strength, vid, vdata)
+    # Get the palette of blocks.
+    if len(blocks) == 1:
+        print "Selection only has one block type, no smoothing to perform."
+        return
+    assert len(blocks) == 2
+    vid, vdata = blocks[0]
+    nvid, nvdata = blocks[1]
+
 
     # Get the smoothed blocks. This is a boolean array where true = non-void.
     non_void = smooth(cache, box, strength)
@@ -46,8 +46,8 @@ def perform(level, box, options):
         nv = non_void[slices]
 
         # Replace the non-void blocks.
-        ids[nv] = fid
-        datas[nv] = fdata
+        ids[nv] = nvid
+        datas[nv] = nvdata
 
         # Replace the void blocks.
         ids[nv == False] = vid # double negative.
@@ -89,12 +89,21 @@ def perform(level, box, options):
     return
 
 
-def get_cache(level, box, strength, vid, vdata):
+
+def get_cache(level, box, strength):
     # Need to expand the box to include `strength` extra blocks in all
     # directions, so that we can find the blocks in a `strength` radius around
     # every block in the actual selection. Aka, we don't need each house, we need
     # the whole neighbourhood.
     neighbourhood_box = box.expand(strength)
+
+    # We can just clamp the y axis instead of throwing if the selection grows too
+    # tall. This clamping is dealt with in `smooth` when shifting, by assuming
+    # that the closest layer is repeated out-of-bounds.
+    x, _, z = neighbourhood_box.origin
+    w, _, l = neighbourhood_box.size
+    max_box = BoundingBox(origin=(x, 0, z), size=(w, 256, l))
+    neighbourhood_box = neighbourhood_box.intersect(max_box)
 
 
     # However, must ensure that we don't go out of bounds of the world. So check
@@ -106,22 +115,61 @@ def get_cache(level, box, strength, vid, vdata):
             "chunks.")
 
 
-    # We can just clamp the y axis instead of throwing if the selection grows too
-    # tall. This clamping is dealt with in `smooth`, by assuming that the closest
-    # layer is repeated out-of-bounds.
-    x, _, z = neighbourhood_box.origin
-    w, _, l = neighbourhood_box.size
-    max_box = BoundingBox((x, 0, z), (w, 256, l))
-    neighbourhood_box = neighbourhood_box.intersect(max_box)
+    # We need to pick one block to act as the "void" block. The operation is
+    # "symmetrical" with respect to this block so it doesn't matter what we
+    # choose.
+    vid = level.blockAt(*box.origin)
+    vdata = level.blockDataAt(*box.origin)
 
+
+    # The unique blocks in the level, stored as a set of tuples of (bid, bdata).
+    # I think the bid and bdata are of type np.uint16 not int but it doesn't
+    # really matter.
+    unique_blocks = set()
 
     # Now cache which blocks are non-void.
     neighbourhood = np.empty(br.shape(neighbourhood_box), dtype=bool)
     for ids, datas, slices in br.iterate(level, neighbourhood_box, br.BLOCKS):
+        # Get a list of all the blocks in this iteration.
+        blocks = np.stack((ids, datas), axis=-1)
+        blocks = blocks.reshape(-1, 2)
+        # Now axis=0 goes along the blocks and axis=1 stores the bid, bdata.
+
+        # However, since this version of numpy doesn't have an axis argument for
+        # `unique`, we gotta roll our own.
+
+        # Treat the rows of bid,bdata pairs as a single element.
+        merged_dtype = np.dtype((np.void, 2 * blocks.dtype.itemsize))
+        merged_blocks = blocks.view(merged_dtype)
+
+        # Find the unique blocks.
+        unique = np.unique(merged_blocks)
+
+        # Convert back to the unpacked view.
+        unique = unique.view(blocks.dtype).reshape(-1, 2)
+
+        # Add the unique blocks. Note we convert to a tuple to make it hashable.
+        unique_blocks |= set((bid, bdata) for bid, bdata in unique)
+
         # Add the non-void masks.
         neighbourhood[slices] = ((ids != vid) | (datas != vdata))
 
-    return neighbourhood, neighbourhood_box
+    # If there are more than 2 blocks in the selection, no can do.
+    if len(unique_blocks) > 2:
+        raise Exception("Selection has more than 2 block types.")
+
+
+    cache = neighbourhood, neighbourhood_box
+
+    # We also gotta return the blocks used.
+    if len(unique_blocks) == 2:
+        unique_blocks -= {(vid, vdata)} # remove the void block.
+        blocks = (vid, vdata), next(iter(unique_blocks))
+    else:
+        # No second block.
+        blocks = ((vid, vdata), )
+
+    return cache, blocks
 
 
 
@@ -151,9 +199,9 @@ def smooth(cache, box, strength):
             summed += br.shift(unshifted, by, axis, clamp=True, out=mem)
 
 
-    # Cut the summed array from the neighbourhood shape to the user selection
-    # box. Can't just hard-code strength:len-strength because the cache shape can
-    # be unpredictable with clipping due to world boundaries.
+    # Cut the array from the neighbourhood shape to the user selection box.
+    # Can't just hard-code strength:len-strength because the cache shape can be
+    # unpredictable with clipping due to world boundaries.
     mask = mask_from(neighbourhood_box, box)
     summed = summed[mask]
 
@@ -161,8 +209,9 @@ def smooth(cache, box, strength):
     # To find which blocks should be non-void, we check if it has more neighbours
     # of non-void than not. That is, if the average block around this one is
     # non-void. This is simply a matter of checking if it's greater than half the
-    # neighbour (cube) volume.
-    cutoff = ((2 * strength + 1) ** 3) // 2
+    # neighbour (cube) volume. Note that this will always be an odd number, so we
+    # can always get a clean majority.
+    cutoff = ((2*strength + 1) ** 3) // 2
     non_void = (summed > cutoff)
 
 

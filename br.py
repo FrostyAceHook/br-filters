@@ -966,7 +966,9 @@ def iterate(level, box, method, holey=False):
     # tested this one yet, but that seems to indicate that the problem is at
     # least related to unloading).
     for chunk, slices, point in level.getChunkSlices(box):
-        chunk.dirty = True
+        # Set to dirty also with lighting recalculation, since we don't know if
+        # the filter is going to affect lighting so just assume it do.
+        chunk.chunkChanged(calcLighting=True)
         chunks.append(chunk)
 
 
