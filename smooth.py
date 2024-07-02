@@ -1,14 +1,18 @@
 import br
 import numpy as np
+from itertools import product
 from pymclevel import alphaMaterials, BoundingBox
 
-displayName = "Smoother (brain)"
+displayName = "Smoothest (brain)"
 
 inputs = (
     ("Replaces the selection with a smoothed version of the blocks. Within and "
             "up-to 'strength' blocks outside of the selection, there must be at-"
-            "most two different blocks.", "label"),
+            "most two different blocks. When feathering, the edges of the "
+            "selection will attempt to more smoothly join to the blocks outside "
+            "of the selection.", "label"),
     ("Strength:", (3, 1, 15)),
+    ("Feather?", False),
 )
 
 
@@ -22,11 +26,13 @@ inputs = (
 
 def perform(level, box, options):
     strength = options["Strength:"]
+    feather = options["Feather?"]
 
     print "Strength: {}".format(strength)
+    print "Feather: {}".format(feather)
 
-    # Copy the selection blocks + surrounding blocks to a cache.
-    cache, blocks = get_cache(level, box, strength)
+    # Copy the selection blocks + surrounding blocks.
+    cache, blocks = extract(level, box, strength)
 
     # Get the palette of blocks.
     if len(blocks) == 1:
@@ -38,7 +44,7 @@ def perform(level, box, options):
 
 
     # Get the smoothed blocks. This is a boolean array where true = non-void.
-    non_void = smooth(cache, box, strength)
+    non_void = smooth(cache, box, strength, feather)
 
     # Copy to level.
     for ids, datas, slices in br.iterate(level, box, br.BLOCKS):
@@ -90,7 +96,7 @@ def perform(level, box, options):
 
 
 
-def get_cache(level, box, strength):
+def extract(level, box, strength):
     # Need to expand the box to include `strength` extra blocks in all
     # directions, so that we can find the blocks in a `strength` radius around
     # every block in the actual selection. Aka, we don't need each house, we need
@@ -156,7 +162,7 @@ def get_cache(level, box, strength):
 
     # If there are more than 2 blocks in the selection, no can do.
     if len(unique_blocks) > 2:
-        raise Exception("Selection has more than 2 block types.")
+        raise Exception("Selection/surroundings have more than 2 block types.")
 
 
     cache = neighbourhood, neighbourhood_box
@@ -173,7 +179,7 @@ def get_cache(level, box, strength):
 
 
 
-def smooth(cache, box, strength):
+def smooth(cache, box, strength, feather):
     neighbourhood, neighbourhood_box = cache
 
     # Need to replace every value with the sum of its neighbours, up to
@@ -181,42 +187,81 @@ def smooth(cache, box, strength):
     summed = neighbourhood.astype(np.uint16)
 
 
-    # Preallocate the memory.
-    mem = np.empty_like(summed)
-    unshifted = np.empty_like(summed)
+    # Preallocate some memory.
+    tmp1 = np.empty_like(summed)
+    tmp2 = np.empty_like(summed)
 
-    # Simple algorithm to sum in a cube around each point.
+    if not feather:
+
+        # Sum in a cube around each block.
+        sum_cube(summed, strength, tmp1, tmp2)
+
+        # To find which blocks should be non-void, we check if it has more
+        # neighbours of non-void than not. That is, if the average block around
+        # this one is non-void. This is simply a matter of checking if it's
+        # greater than half the neighbour (cube) volume. Note that this will always
+        # be an odd number, so we can always get a clean majority.
+        cutoff = ((2*strength + 1) ** 3) // 2
+        non_void = (summed > cutoff)
+
+    else:
+        # If we are feathering, we want the smooth strength to linearly increase
+        # from 1 to its maximum (`strength`) when going from the outside inwards.
+        # Essentially, shells of increasing smooth radius.
+
+        non_void = np.empty(summed.shape, dtype=bool)
+
+        # The smoothed array for the current smooth radius.
+        this = np.empty_like(summed)
+
+        # Build up to the full smooth strength.
+        for size in range(1, strength + 1):
+            # Do this iteration of smooth strength.
+            this[:] = summed
+            sum_cube(this, size, tmp1, tmp2)
+            cutoff = ((2*size + 1) ** 3) // 2
+
+            # Gotta do some awkward logic to get the slices of the current
+            # iteration's box (which shirnks by 1 every iteration).
+            inset_by = size - 1
+            slices = mask_from(neighbourhood_box, box)
+            slices = tuple(
+                slice(s.start + inset_by, s.stop - inset_by)
+                for s in slices
+            )
+
+            # Set this section. Note this always includes the centre, so while
+            # early iterations will affect more than just a shell, the inside
+            # will be overwritten by later ones so the overall effect is a shell.
+            non_void[slices] = (this > cutoff)[slices]
+
+
+    # Cut the array from the neighbourhood shape to the user selection box. Can't
+    # just hard-code strength:len-strength because the cache shape can be
+    # unpredictable with clipping due to world boundaries.
+    mask = mask_from(neighbourhood_box, box)
+    non_void = non_void[mask]
+
+    # Too easy.
+    return non_void
+
+
+
+def sum_cube(array, size, tmp1, tmp2):
+    # Simple algorithm to in-place sum in a cube of radius `size` around each
+    # cell.
+
+    # Across axes, a stack-on effect is desired.
     for axis in br.AXES:
-        # Need to copy before shifting along this axis to prevent a stack-on
-        # effect where past shifts are repeated.
-        unshifted[:] = summed
-        for by in range(-strength, strength + 1):
-            if by == 0:
+        # Within an axis however, that stack-on would make a non-linear sum.
+        tmp1[:] = array
+        for by in range(-size, size + 1):
+            if by == 0: # don't double-count indices with themselves.
                 continue
             # Add the neighbours, using clamp to avoid excessively filling void
             # around the world top/bottom (instead assuming the closest layer was
             # repeated out of bounds).
-            summed += br.shift(unshifted, by, axis, clamp=True, out=mem)
-
-
-    # Cut the array from the neighbourhood shape to the user selection box.
-    # Can't just hard-code strength:len-strength because the cache shape can be
-    # unpredictable with clipping due to world boundaries.
-    mask = mask_from(neighbourhood_box, box)
-    summed = summed[mask]
-
-
-    # To find which blocks should be non-void, we check if it has more neighbours
-    # of non-void than not. That is, if the average block around this one is
-    # non-void. This is simply a matter of checking if it's greater than half the
-    # neighbour (cube) volume. Note that this will always be an odd number, so we
-    # can always get a clean majority.
-    cutoff = ((2*strength + 1) ** 3) // 2
-    non_void = (summed > cutoff)
-
-
-    # Too easy.
-    return non_void
+            array += br.shift(tmp1, by, axis, clamp=True, out=tmp2)
 
 
 
@@ -235,5 +280,6 @@ def mask_from(neighbourhood_box, box):
     # final mask will be the same as `box`. So we can just shift the `box` to
     # have an origin at the origin of `neighbourhood` to find the indices we
     # need.
+    assert all(a >= b for a, b in zip(neighbourhood_box.size, box.size))
     mask_box = BoundingBox(box.origin - neighbourhood_box.origin, box.size)
     return br.box_slices(mask_box)
