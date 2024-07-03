@@ -570,7 +570,7 @@ def op_set(level, box, options):
 
     # Iterate through all chunks in the selection.
     count = 0
-    for chunk in br.iterate(level, box, br.CHUNKS):
+    for chunk, _, _ in br.iterate(level, box, br.DEFAULT):
         tes = chunk.TileEntities
         # Iterate through all tile entities.
         for i, te in enumerate(tes):
@@ -628,7 +628,7 @@ def op_create(level, box, options):
         all_datas.append(datas)
         all_slices.append(slices)
 
-    for chunk in br.iterate(level, box, br.CHUNKS):
+    for chunk, _, _ in br.iterate(level, box, br.DEFAULT):
         all_tes.append(chunk.TileEntities)
 
 
