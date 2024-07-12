@@ -51,7 +51,7 @@ inputs += (
 
 
 def perform(level, box, options):
-    find = prefix(options["Item id:"]), options["Item data:"]
+    find = br.prefix(options["Item id:"]), options["Item data:"]
     print "Finding ({}, {}) ...".format(*find)
 
     print_each_storage = options["Print every location:"]
@@ -78,7 +78,7 @@ def perform(level, box, options):
         # Count how many items match.
         count = 0
         for item in items:
-            item_id = prefix(item["id"].value)
+            item_id = br.prefix(item["id"].value)
             item_damage = item["Damage"].value
             if (item_id, item_damage) != find:
                 continue
@@ -160,11 +160,3 @@ def storages(level, box, tile_ids, entity_ids):
         ipos = tuple(int(floor(x)) for x in pos)
 
         yield NAMES[eid], ipos, items
-
-
-# Add the "minecraft:" prefix if not present. In theory, everything should
-# already have this but better be safe then sorry (intentional).
-def prefix(item_id):
-    if not item_id.startswith("minecraft:"):
-        item_id = "minecraft:" + item_id
-    return item_id

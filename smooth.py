@@ -282,4 +282,4 @@ def mask_from(neighbourhood_box, box):
     # need.
     assert all(a >= b for a, b in zip(neighbourhood_box.size, box.size))
     mask_box = BoundingBox(box.origin - neighbourhood_box.origin, box.size)
-    return br.box_slices(mask_box)
+    return br.slices(mask_box)

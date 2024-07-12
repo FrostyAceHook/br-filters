@@ -70,12 +70,15 @@ def selector(name, spec):
         "white":        0,
         "orange":       1,
         "magenta":      2,
+        "lightblue":    3,
         "light_blue":   3,
         "yellow":       4,
         "lime":         5,
         "pink":         6,
         "grey":         7,
         "gray":         7, # inclusivity.
+        "lightgrey":    8,
+        "lightgray":    8,
         "light_grey":   8,
         "light_gray":   8,
         "cyan":         9,
@@ -109,6 +112,7 @@ def selector(name, spec):
         "flowing_lava":                     10,
         "lava":                             11,
         "sand":                             12,
+        "snad":                             12,
         "gravel":                           13,
         "gold_ore":                         14,
         "iron_ore":                         15,
@@ -316,6 +320,7 @@ def selector(name, spec):
         "quartz_stairs":                    156,
         "activator_rail":                   157,
         "dropper":                          158,
+        "stained_clay":                     159,
         "stained_terracotta":               159,
         "stained_hardened_clay":            159,
         "stained_pane":                     160,
@@ -1125,9 +1130,9 @@ BIOME_NAMES = tuple(BIOME_IDOF.keys())
 def biome_str(biome_id):
     # If it's a recognised id, return its nice-name.
     if biome_id in BIOME_NAMEOF:
-        return "\"{}\" ({})".format(BIOME_NAMEOF[biome_id], biome_id)
+        return "\"{}\" (id: {})".format(BIOME_NAMEOF[biome_id], biome_id)
     else:
-        return str(biome_id)
+        return "unrecognised biome (id: {})".format(biome_id)
 
 
 
@@ -1163,10 +1168,10 @@ def shift(array, by, axis, clamp=False, out=None):
 
 
     # Slices the offset section of the shifted array to copy data to.
-    shifted = slices(axis, abs(by), None)
+    shifted = slice_along(axis, abs(by), None)
 
     # Slices the section of the array to copy.
-    unshifted = slices(axis, None, axis_len - abs(by))
+    unshifted = slice_along(axis, None, axis_len - abs(by))
 
     # If it's shifting backwards, just swap the slices.
     if by < 0:
@@ -1181,7 +1186,7 @@ def shift(array, by, axis, clamp=False, out=None):
 
 
     # Slices the empty part of the shifted array.
-    empty = slices(axis, *((None, by) if (by > 0) else (by, None)))
+    empty = slice_along(axis, *((None, by) if (by > 0) else (by, None)))
 
     # If it's clamped gotta copy the data into the now empties.
     if clamp:
@@ -1189,7 +1194,7 @@ def shift(array, by, axis, clamp=False, out=None):
         # first slice of the original array. Do it like this so that `mem` can
         # actually be the same memory as array, if the original array is no
         # longer needed.
-        clamped = slices(axis, *((by, by + 1) if (by > 0) else (by - 1, by)))
+        clamped = slice_along(axis, by - (by < 0), by + (by > 0)) # trust.
 
         # Fill the empty part.
         out[empty] = out[clamped]
@@ -1203,18 +1208,19 @@ def shift(array, by, axis, clamp=False, out=None):
 
 # Same as `shift` however instead of only shifting along a single axis, shifts
 # along all three axes by their respective `<axis>_by` slots.
-def shift_xyz(array, x_by, y_by, z_by, clamp=False, out=None):
+def shift_xzy(array, x_by, z_by, y_by, clamp=False, out=None):
     out = shift(array, x_by, AXIS_X, clamp=clamp, out=out)
-    out = shift(out, y_by, AXIS_Y, clamp=clamp, out=out)
     out = shift(out, z_by, AXIS_Z, clamp=clamp, out=out)
+    out = shift(out, y_by, AXIS_Y, clamp=clamp, out=out)
     return out
 
 
 
 # Returns the slices that would index `slice(start, end, step)` along the given
 # axis, and then every element along the others.
-def slices(axis, start, end, step=None):
+def slice_along(axis, start, end, step=None):
     return axis*(slice(None),) + (slice(start, end, step),)
+
 
 
 # Returns the shape of the box, in x,z,y order.
@@ -1223,8 +1229,15 @@ def shape(box):
     w, h, l = box.size
     return w, l, h
 
-
 # Returns the slices of the box, in x,z,y order.
-def box_slices(box):
+def slices(box):
     x, y, z = [slice(p1, p2) for p1, p2 in zip(box.origin, box.maximum)]
     return x, z, y
+
+
+
+# Adds the "minecraft:" prefix if not present.
+def prefix(name):
+    if not name.startswith("minecraft:"):
+        name = "minecraft:" + name
+    return name

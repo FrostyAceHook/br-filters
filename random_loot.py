@@ -234,7 +234,7 @@ def parse(line, line_number):
     # Prase <item_id>.
     if not can_string(tokens[1]):
         throw("<item_id> must be a string.")
-    item_id = u"minecraft:{}".format(tokens[1])
+    item_id = br.prefix(tokens[1])
 
     # Parse <item_data>.
     if not can_integer(tokens[2]):

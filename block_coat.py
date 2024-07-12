@@ -107,5 +107,5 @@ def expand(mask, replace_mask, shifted, unshifted, expand_to):
 
         # Add this direction if it's within the permitted directions.
         if sum_coords <= max_sum_coords:
-            br.shift_xyz(unshifted, *adj, out=shifted)
+            br.shift_xzy(unshifted, *adj, out=shifted)
             mask |= (shifted & replace_mask)

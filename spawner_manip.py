@@ -114,7 +114,7 @@ EIDS = OrderedDict([
     ("skeleton",        "minecraft:skeleton"),
     ("creeper",         "minecraft:creeper"),
     ("spider",          "minecraft:spider"),
-    ("cave_spider",     "minecraft:cave_spider"),
+    ("cave spider",     "minecraft:cave_spider"),
     ("blaze",           "minecraft:blaze"),
     ("wither skeleton", "minecraft:wither_skeleton"),
     ("ghast",           "minecraft:ghast"),
@@ -688,9 +688,9 @@ def op_find(level, box, options):
     version = options["  Version:"] # note two spaces.
     entity_id = options["Entity id:"]
 
-    # Add prefix if they didn't.
-    if not entity_id.startswith("minecraft:"):
-        entity_id = "minecraft:" + entity_id
+    # If in 1.12, ensure it's minecraft: prefixed.
+    if version == "1.12":
+        entity_id = br.prefix(entity_id)
 
 
     # Go through all the spawners.

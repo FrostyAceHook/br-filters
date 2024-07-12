@@ -199,13 +199,13 @@ def lerp(data, axis, scale):
     # and weights in the negative direction. This is possible because `repeated`
     # and `weighted` are too long by `scale-1` along the axis since they repeat
     # the last element when it's in fact the end.
-    slice_from = br.slices(axis, scale - 1, None)
-    slice_until = br.slices(axis, None, 1 - scale)
+    slice_from = br.slice_along(axis, scale - 1, None)
+    slice_until = br.slice_along(axis, None, 1 - scale)
 
     repeated_neg = repeated_pos[slice_from]
     weighted_neg = 1 - weighted_pos[slice_until]
     # To avoid double-counting at nodes, just set each node weight to 0.
-    weighted_neg[br.slices(axis, None, None, scale)] = 0.0
+    weighted_neg[br.slice_along(axis, None, None, scale)] = 0.0
 
 
     # Do positive direction, cutting down to the correct size.

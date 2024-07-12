@@ -49,6 +49,6 @@ def get_mask(box):
     mask = np.ones(br.shape(box), dtype=bool)
 
     # Exclude the inner box.
-    mask[br.box_slices(shrinked_box)] = 0
+    mask[br.slices(shrinked_box)] = 0
 
     return mask

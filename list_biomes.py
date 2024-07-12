@@ -32,7 +32,7 @@ def perform(level, box, options):
         print "  {}: {} columns".format(br.biome_str(biome), count)
 
 
-    # Now do a sick map of the entire square selection.
+    # Now do a sick map of the entire selection.
     CHARSET = " .:~!?=+*#%$&@"
 
     # Aaaactually gotta check if we should (if there are few enough biomes to fit
@@ -51,7 +51,7 @@ def perform(level, box, options):
         print "But now for a sick map:"
 
         # Assign the most-frequent biomes the earliest indices (aka make them
-        # darker characters and stand-out less).
+        # darker characters that stand-out less).
         charmap = dict()
         for i, (biome, _) in enumerate(totals):
             # https://www.desmos.com/calculator/frji73r84b
