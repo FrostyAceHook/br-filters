@@ -2,6 +2,7 @@ import br
 from itertools import chain
 from collections import OrderedDict
 from math import floor
+from pymclevel import TAG_String
 
 displayName = "Find"
 
@@ -33,8 +34,10 @@ def to_option(name):
 
 
 inputs = (
-    ("Check the console for the results. The item id doesn't need the "
-            "\"minecraft:\", it will be added if not present.", "label"),
+    ("Check the console for the results. For versions with an integer item id, "
+            "typing an integer as the id will leave it unchanged. Otherwise, "
+            "the item id is assumed to be a string and the \"minecraft:\" "
+            "prefix will be added if not present.", "label"),
     ("Item id:", "string"),
     ("Item data:", (0, 0, 32767)),
     ("Print every location:", True),
@@ -51,8 +54,13 @@ inputs += (
 
 
 def perform(level, box, options):
-    find = br.prefix(options["Item id:"]), options["Item data:"]
-    print "Finding ({}, {}) ...".format(*find)
+    # Try to convert the id to an integer, otherwise prefix it.
+    try:
+        find = int(options["Item id:"]), options["Item data:"]
+        print "Finding ({}:{}) ...".format(*find)
+    except ValueError:
+        find = br.prefix(options["Item id:"]), options["Item data:"]
+        print "Finding (\"{}\", {}) ...".format(*find)
 
     print_each_storage = options["Print every location:"]
 
@@ -78,8 +86,14 @@ def perform(level, box, options):
         # Count how many items match.
         count = 0
         for item in items:
-            item_id = br.prefix(item["id"].value)
+            # Get (and prefix) the item name if it's a string.
+            if isinstance(item["id"], TAG_String):
+                item_id = br.prefix(item["id"].value)
+            # Otherwise leave it as an integer.
+            else:
+                item_id = item["id"].value
             item_damage = item["Damage"].value
+
             if (item_id, item_damage) != find:
                 continue
 
