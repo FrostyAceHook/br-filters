@@ -5,6 +5,11 @@ from pymclevel import alphaMaterials, BoundingBox
 displayName = "Shell"
 
 inputs = (
+    ("NOTE: Uses a selector string for 'find' and 'replace'.\n"
+            "See `br.py` for the selector string syntax specifics. For simple "
+            "use, just type a block id/name with optional data (i.e. \"stone\" "
+            "for any stone or \"stone:3\" for diorite).", "label"),
+    ("Replace:", "string"),
     ("Block:", alphaMaterials.Bedrock),
     ("Cheeky bedrock box filter. If used with a selection where one dimension "
             "is only 1 block long, it will make a ring.", "label"),
@@ -12,24 +17,26 @@ inputs = (
 
 
 def perform(level, box, options):
+    replace = br.selector("replace", options["Replace:"])
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
     # Get the block mask.
-    mask = get_mask(box)
+    shell = get_shell(box)
 
     # Place em (holey style).
     for ids, datas, slices in br.iterate(level, box, br.BLOCKS, holey=True):
-        cur_mask = mask[slices]
+        mask = shell[slices]
+        mask &= replace.matches(ids, datas)
 
-        ids[cur_mask] = bid
-        datas[cur_mask] = bdata
+        ids[mask] = bid
+        datas[mask] = bdata
 
 
     print "Finished shelling."
     return
 
 
-def get_mask(box):
+def get_shell(box):
     if sum(d == 1 for d in box.size) > 1:
         raise Exception("Cannot have a selection with more than one dimension "
                 "of length 1.")
