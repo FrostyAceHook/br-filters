@@ -39,7 +39,7 @@ def iter_line(x, y, z, x2, y2, z2):
     iz = 1 if (z2 > z) else -1
 
     # Yield the first point separately.
-    yield x, y, z
+    points = [(x, y, z)]
 
     # Find the longest axis and iterate along it.
     if dx == max(dx, dy, dz):
@@ -55,7 +55,7 @@ def iter_line(x, y, z, x2, y2, z2):
                 D2 -= 2 * dx
             D1 += 2 * dy
             D2 += 2 * dz
-            yield x, y, z
+            points.append((x, y, z))
 
     elif dy == max(dx, dy, dz):
         D1 = (2 * dx) - dy
@@ -70,7 +70,7 @@ def iter_line(x, y, z, x2, y2, z2):
                 D2 -= 2 * dy
             D1 += 2 * dx
             D2 += 2 * dz
-            yield x, y, z
+            points.append((x, y, z))
 
     else:
         D1 = (2 * dy) - dz
@@ -85,4 +85,6 @@ def iter_line(x, y, z, x2, y2, z2):
                 D2 -= 2 * dz
             D1 += 2 * dy
             D2 += 2 * dx
-            yield x, y, z
+            points.append((x, y, z))
+
+    return points
