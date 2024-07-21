@@ -4,33 +4,51 @@ displayName = "Mark Selection"
 
 inputs = (
     ("Block:", alphaMaterials.Glowstone),
-    ("Replaces the two corners of the selection with 'block'. Used to mark a "
-            "selection so that in the future, this selection can easily be made "
-            "by clicking these two blocks.", "label"),
+    ("Place at:", ("two selected", "all corners")),
+    ("Replaces some corners of the selection with 'block', to mark this "
+            "selection so that in the future it can be easily made again by "
+            "clicking the corners.", "label"),
 )
 
 
 def perform(level, box, options):
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
+    all_corners = (options["Place at:"] == "all corners")
 
-    try:
-        # Try do a little dodgy and access the "leaked" editor object to set the
-        # genuine corners of the selection (i.e. the yellow and blue blocks).
-        x1, y1, z1 = editor.selectionTool.bottomLeftPoint
-        x2, y2, z2 = editor.selectionTool.topRightPoint
-    except Exception:
-        # Otherwise just take the two extreme corners.
-        x1, y1, z1 = box.origin
-        x2, y2, z2 = box.maximum
-        # The upper bound isn't included but we wanna place blocks in the
-        # selection.
-        x2, y2, z2 = x2 - 1, y2 - 1, z2 - 1
 
-    # Set the two corners.
-    level.setBlockAt(x1, y1, z1, bid)
-    level.setBlockAt(x2, y2, z2, bid)
-    level.setBlockDataAt(x1, y1, z1, bdata)
-    level.setBlockDataAt(x2, y2, z2, bdata)
+    # Place at all eight corners.
+    if all_corners:
+        corners = [
+            (x, y, z)
+            for x in (box.minx, box.maxx - 1)
+            for y in (box.miny, box.maxy - 1)
+            for z in (box.minz, box.maxz - 1)
+        ]
+
+    else:
+        try:
+            # Try do a little dodgy and access the "leaked" editor object to set
+            # the genuine corners of the selection (i.e. the yellow and blue
+            # blocks).
+            corners = [
+                editor.selectionTool.bottomLeftPoint,
+                editor.selectionTool.topRightPoint,
+            ]
+        except UnboundLocalError:
+            # Otherwise just take the two extreme corners.
+            corners = [
+                box.origin,
+                # The upper bound is the exclusive maximum, so move it back to
+                # the block that's in the selection.
+                tuple(c - 1 for c in box.maximum),
+            ]
+
+
+    # Set the corners.
+    for x, y, z in corners:
+        level.setBlockAt(x, y, z, bid)
+        level.setBlockDataAt(x, y, z, bdata)
+
 
     print "Finished marking selection."
     return
