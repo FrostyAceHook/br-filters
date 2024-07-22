@@ -20,7 +20,7 @@ def perform(level, box, options):
 
         # Add it if it's empty.
         if len(te["Items"]) == 0:
-            poses.append(pos)
+            positions.append(pos)
 
     # Print the findings.
     count = len(positions)
