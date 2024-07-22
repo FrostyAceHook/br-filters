@@ -1,8 +1,14 @@
-import br
 import os
 import random as rdm
 from pymclevel import TAG_Byte, TAG_Short, TAG_Int, TAG_String, TAG_List, \
         TAG_Compound, TileEntity
+
+try:
+    import br
+except ImportError:
+    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
+            "in the same filter folder?")
+
 
 displayName = "Random Loot"
 

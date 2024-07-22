@@ -1,7 +1,13 @@
-import br
 import numpy as np
 from itertools import product
 from pymclevel import alphaMaterials
+
+try:
+    import br
+except ImportError:
+    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
+            "in the same filter folder?")
+
 
 displayName = "Block Coat"
 

@@ -1,8 +1,14 @@
-import br
 from itertools import chain
 from collections import OrderedDict
 from math import floor
 from pymclevel import TAG_String
+
+try:
+    import br
+except ImportError:
+    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
+            "in the same filter folder?")
+
 
 displayName = "Find"
 

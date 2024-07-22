@@ -1,10 +1,16 @@
-import br
 import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
 from pymclevel import TAG_Byte, TAG_Short, TAG_Int, TAG_String, TAG_List, \
         TAG_Compound, TileEntity
 from random import randint
+
+try:
+    import br
+except ImportError:
+    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
+            "in the same filter folder?")
+
 
 displayName = "Spawner Manip"
 
