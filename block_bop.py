@@ -1,4 +1,5 @@
 import numpy as np
+from collections import OrderedDict
 from pymclevel import alphaMaterials
 
 try:
@@ -8,10 +9,17 @@ except ImportError:
             "in the same filter folder?")
 
 
-displayName = "Block Bop"
+displayName = "Drip-ip"
 
-# bruh why cant u start an option w a '-'??
-DIRECTIONS = "+x", " -x", "+z", " -z", "+y", " -y"
+DIRECTIONS = OrderedDict([
+    # bruh why cant u start an option w a '-'??
+    (" -y", (-1, br.AXIS_Y)),
+    (" -x", (-1, br.AXIS_X)),
+    (" -z", (-1, br.AXIS_Z)),
+    ("+y", (1, br.AXIS_Y)),
+    ("+x", (1, br.AXIS_X)),
+    ("+z", (1, br.AXIS_Z)),
+])
 
 inputs = (
     ("NOTE: Uses a selector string for 'find' and 'replace'.\n"
@@ -21,31 +29,33 @@ inputs = (
     ("Find:", "string"),
     ("Replace:", "string"),
     ("Block:", alphaMaterials.Stone),
-    ("Direction:", DIRECTIONS),
+    ("Direction:", tuple(DIRECTIONS.keys())),
     ("Min depth:", (1, 0, 256)),
     ("Max depth:", (1, 0, 256)),
+    ("Chance%:", (100.0, 0.0, 100.0)),
     ("For every 'find' block in the selection, replace a random number of "
             "blocks in the given 'direction'; provided they are the 'replace' "
             "block. The number of blocks is a random number between the given "
-            "'min depth' and 'max depth', inclusive of each.", "label"),
+            "'min depth' and 'max depth', inclusive of each. Each of these "
+            "\"drips\" only have a 'chance' to be placed.", "label"),
 )
 
 
 def perform(level, box, options):
     # Get the options.
-    direction = DIRECTIONS.index(options["Direction:"])
-    sign = (-1 if (direction & 1) else 1) # alternating +/-.
-    axis = direction // 2
-
+    sign, axis = DIRECTIONS[options["Direction:"]]
     depth_min = options["Min depth:"]
     depth_max = options["Max depth:"]
+    chance = options["Chance%:"] / 100.0
+
     # dumas check.
     if depth_max < depth_min:
-        raise Exception("Min depth must be <= max depth.")
+        raise Exception("'max depth' cannot be smaller than 'min depth'")
 
     print "Direction: {}".format(options["Direction:"].strip())
     print "Min depth: {}".format(depth_min)
     print "Max depth: {}".format(depth_max)
+    print "Chance: {}%".format(options["Chance%:"])
 
 
     find = br.selector("find", options["Find:"])
@@ -53,7 +63,8 @@ def perform(level, box, options):
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
     # Get the block mask. This is where the real work is.
-    mask = matches(level, box, find, replace, axis, sign, depth_min, depth_max)
+    mask = matches(level, box, find, replace, axis, sign, depth_min, depth_max,
+            chance)
 
     # Place the blocks.
     for ids, datas, slices in br.iterate(level, box, br.BLOCKS):
@@ -63,11 +74,11 @@ def perform(level, box, options):
         ids[cur_mask] = bid
         datas[cur_mask] = bdata
 
-    print "Finished block bopping."
+    print "Finished dripping."
     return
 
 
-def matches(level, box, find, replace, axis, sign, depth_min, depth_max):
+def matches(level, box, find, replace, axis, sign, depth_min, depth_max, chance):
     # Algorithm:
     # Mask the find and replace blocks in the whole selection. Shift the find
     # mask block by block, using logical & with the replace mask to select the
@@ -93,6 +104,11 @@ def matches(level, box, find, replace, axis, sign, depth_min, depth_max):
     # Use the original find matches as a seed, make sure to removed them after
     # the shifting.
     mask = np.copy(find_mask)
+
+    # Randomly cull now.
+    rand = np.random.random_sample(br.shape(box))
+    mask &= (rand < chance)
+
 
     # Now do the initial shifting of the array, up to min depth.
     for _ in range(depth_min):
