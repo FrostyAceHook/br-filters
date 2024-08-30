@@ -6,8 +6,14 @@ from pymclevel import TAG_String
 try:
     import br
 except ImportError:
-    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
-            "in the same filter folder?")
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
 displayName = "Find"
@@ -40,10 +46,11 @@ def to_option(name):
 
 
 inputs = (
-    ("Check the console for the results. For versions with an integer item id, "
-            "typing an integer as the id will leave it unchanged. Otherwise, "
-            "the item id is assumed to be a string and the \"minecraft:\" "
-            "prefix will be added if not present.", "label"),
+    ("Finds all the locations where an item is stored (in selection), "
+            "optionally printing each location to the console. For versions "
+            "with an integer item id, typing an integer as the id will leave it "
+            "unchanged. Otherwise, the item id is assumed to be a string and "
+            "the \"minecraft:\" prefix will be added if not present.", "label"),
     ("Item id:", "string"),
     ("Item data:", (0, 0, 32767)),
     ("Print every location:", True),
@@ -63,10 +70,10 @@ def perform(level, box, options):
     # Try to convert the id to an integer, otherwise prefix it.
     try:
         find = int(options["Item id:"]), options["Item data:"]
-        print "Finding ({}:{}) ...".format(*find)
+        print "Finding ({}:{}):".format(*find)
     except ValueError:
         find = br.prefix(options["Item id:"]), options["Item data:"]
-        print "Finding (\"{}\", {}) ...".format(*find)
+        print "Finding (\"{}\", {}):".format(*find)
 
     print_each_storage = options["Print every location:"]
 
@@ -110,22 +117,22 @@ def perform(level, box, options):
             total_count += count
             storage_count += 1
 
-            # Format: "[chest] (0,64,0): 5", meaning found 5 items in the chest
+            # Format: "- [chest] (0,64,0): 5", meaning found 5 items in the chest
             # at x=0, y=64, z=0.
             # This may not be the optimal way of the viewing the data (you may
             # want to sort by x, by z, by count, by something), but just like
             # copy it to a spreadsheet at that point. This is just to gen the
             # data.
             if print_each_storage:
-                print "[{}] {}: {}".format(name, pos, count)
+                print "- [{}] {}: {}".format(name, pos, count)
 
 
     # Print total count.
     if total_count > 0:
-        print "Found {} in total, across {} storage{}.".format(total_count,
-                storage_count, "" if storage_count == 1 else "s")
+        print "- found {} in total, across {} storage{}.".format(total_count,
+                storage_count, br.plural(storage_count))
     else:
-        print "Not found."
+        print "- not found."
 
     return
 

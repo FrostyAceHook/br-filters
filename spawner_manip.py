@@ -8,8 +8,14 @@ from random import randint
 try:
     import br
 except ImportError:
-    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
-            "in the same filter folder?")
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
 displayName = "Spawner Manip"
@@ -191,12 +197,9 @@ inputs = [
     (
         ("Create", "title"),
         ("Replaces the blocks with default spawners.", "label"),
-        ("NOTE: Uses a selector string for 'replace'.\n"
-                "See `br.py` for the selector string syntax specifics. For "
-                "simple use, just type a block id/name with optional data (i.e. "
-                "\"stone\" for any stone or \"stone:3\" for diorite).", "label"),
-        ("Replace:", "string"),
         (" Version:", ("1.12", "1.8")), # space to make unique.
+        ("Replace:", "string"),
+        br.selector_explain("replace"),
     ),
 
     (
@@ -611,7 +614,27 @@ def op_set(level, box, options):
             tes[i] = spawner
 
 
-    print "Modified {} spawner{}.".format(count, "" if count == 1 else "s")
+    print "Finishing modifying spawners:"
+    print "- modified {} spawner{}.".format(count, br.plural(count))
+
+    # bird strike,
+    def log_it(name, value):
+        if isinstance(value, int) and value == -1:
+            value = "unchanged"
+        if value != "unchanged":
+            print "- {}: {}".format(name, value)
+
+    log_it("version", version)
+    log_it("entity", entity)
+    log_it("spawn count", spawn_count)
+    log_it("spawn range", spawn_range)
+    log_it("required player range", required_player_range)
+    log_it("max nearby entities", max_nearby_entities)
+    log_it("min delay", min_delay)
+    log_it("max delay", max_delay)
+    log_it("min initial delay", min_initial_delay)
+    log_it("max initial delay", max_initial_delay)
+
     return
 
 
@@ -685,7 +708,10 @@ def op_create(level, box, options):
             count += 1
 
 
-    print "Created {} spawner{}.".format(count, "" if count == 1 else "s")
+    print "Finishing creating spawners:"
+    print "- created {} spawner{}.".format(count, br.plural(count))
+    print "- version: {}".format(version)
+    print "- replace: {}".format(replace)
     return
 
 
@@ -698,9 +724,13 @@ def op_find(level, box, options):
     if version == "1.12":
         entity_id = br.prefix(entity_id)
 
+    print "Finding spawners:"
+    print "- version: {}".format(version)
+    print "- entity id: {}".format(br.esc(entity_id))
+
+    positions = []
 
     # Go through all the spawners.
-    count = 0
     for teid, pos, te in br.iterate(level, box, br.TES):
         if teid not in SPAWNER_TEID: # Ignore non-spawners.
             continue
@@ -713,23 +743,30 @@ def op_find(level, box, options):
                 matches = (te["EntityId"].value == entity_id)
             else:
                 # Scream about bad data.
-                print "Malformed spawner (for this version) at: {}".format(pos)
+                print "- malformed spawner (for this version) at: {}".format(pos)
 
         elif version == "1.12":
             if (has(te, "SpawnData", TAG_Compound) and
                     has(te["SpawnData"], "id", TAG_String)):
                 matches = (te["SpawnData"]["id"].value == entity_id)
             else:
-                print "Malformed spawner (for this version) at: {}".format(pos)
+                print "- malformed spawner (for this version) at: {}".format(pos)
 
-        # Count and print if it matches.
+        # Add it if it matches.
         if matches:
-            count += 1
-            print "Found spawner at: {}".format(pos)
+            positions.append(pos)
 
 
-    print "Found {} spawner{} with entity id: \"{}\"".format(count,
-            "" if count == 1 else "s", entity_id)
+    # Print the findings.
+    count = len(positions)
+    if count:
+        print "- found {} matching spawner{}, at:".format(count,
+                br.plural(count))
+        for pos in positions:
+            print "- {}".format(pos)
+    else:
+        print "- found no matching spawners."
+
     return
 
 
@@ -745,5 +782,5 @@ def op_list(level, box, options):
         print te
 
 
-    print "Listed {} spawner{}.".format(count, "" if count == 1 else "s")
+    print "Listed {} spawner{}.".format(count, br.plural(count))
     return

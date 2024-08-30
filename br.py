@@ -1,5 +1,7 @@
 import numpy as np
+import os
 from collections import OrderedDict
+from itertools import product
 from pymclevel import TileEntity, Entity
 
 
@@ -58,7 +60,46 @@ from pymclevel import TileEntity, Entity
 #  |_a&&b____________|_binary_|_bool______|_a_and_b______________________|
 #  |_a|b_____________|_binary_|_bool______|_a_or_b_______________________|
 #  |_a||b____________|_binary_|_bool______|_a_or_b_______________________|
-#
+
+
+
+
+# ============================================================================= #
+# == VERSIONING =============================================================== #
+# ============================================================================= #
+
+
+# Version of 'br.py'. Follows semantic versioning.
+VERSION = "2.1.0"
+
+
+# Checks that the current 'br.py' version matches the given `major`, and at-least
+# the given `minor` and `patch`.
+def require_version(major, minor=-1, patch=-1):
+    assert (patch < 0) or (minor >= 0)
+    this_major, this_minor, this_patch = map(int, VERSION.split("."))
+    required = ("{}".format(major)
+        + (minor >= 0) * ".{}".format(minor)
+        + (patch >= 0) * ".{}".format(patch)
+        + (minor < 0 or patch < 0) * ".x"
+    )
+    if (this_major != major) or (this_minor, this_patch) < (minor, patch):
+        s = "Incorrect version of 'br.py' "
+        s += "(got {}, requires {}). ".format(VERSION, required)
+        s += "Please download a compatible version from: "
+        s += "github.com/FrostyAceHook/br-filters"
+        raise ImportError(s)
+
+
+
+
+# ============================================================================= #
+# == SELECTOR STRING ========================================================== #
+# ============================================================================= #
+
+
+# Parses the given selector string and returns a selector object. `spec` must be
+# the selector string, `name` is used for logging only.
 def selector(name, spec):
 
     def throw(desc):
@@ -74,6 +115,8 @@ def selector(name, spec):
         "light_blue":   3,
         "yellow":       4,
         "lime":         5,
+        "lightgreen":   5,
+        "light_green":  5,
         "pink":         6,
         "grey":         7,
         "gray":         7, # inclusivity.
@@ -443,6 +486,7 @@ def selector(name, spec):
         "light_blue_glazed_terracotta":     238,
         "yellow_glazed_terracotta":         239,
         "lime_glazed_terracotta":           240,
+        "light_green_glazed_terracotta":    240,
         "pink_glazed_terracotta":           241,
         "grey_glazed_terracotta":           242,
         "gray_glazed_terracotta":           242,
@@ -503,7 +547,7 @@ def selector(name, spec):
             bid = self.bid
             bdata = "any" if self.bdata is None else self.bdata
             prefix = "not " if self.is_except else ""
-            return "{}{}:{}".format(prefix, bid, bdata)
+            return "({}{}:{})".format(prefix, bid, bdata)
 
 
 
@@ -912,9 +956,187 @@ class Sel:
     def matches(self, ids, datas):
         return self._top.do(ids, datas)
 
+    def mask(self, level, box):
+        mask = np.empty(shape(box), dtype=bool)
+        # Find the masks for the whole selection.
+        for ids, datas, slices in iterate(level, box, BLOCKS):
+            mask[slices] = self.matches(ids, datas)
+        return mask
+
     def __repr__(self):
         return repr(self._top)
 
+
+
+# Returns an option entry explaining the selector string. `names` should be the
+# names of the options which are a selector string.
+def selector_explain(*names):
+    # Get the list of names in one of the forms:
+    #  'a'
+    #  'a' and 'b'
+    #  'a', 'b', ..., and 'c'
+    assert len(names) > 0
+    if len(names) == 1:
+        sels = "'{}'".format(names[0])
+    elif len(names) == 2:
+        sels = "'{}' and '{}'".format(*names)
+    else:
+        # i fw the oxford comma.
+        sels = "".join("'" + name + "', " for name in names[:-1])
+        sels += "and '{}'".format(names[-1])
+
+    return ("NOTE: Uses a selector string for {}.\n".format(sels) +
+            "See `br.py` for the selector string syntax specifics. For simple "
+            "use, leave blank (all blocks) or type a block id/name with "
+            "optional data (i.e. \"stone\" for any stone, \"stone:3\" for "
+            "diorite, \"!stone\" for blocks other than any stone).", "label")
+
+
+
+
+# ============================================================================= #
+# == PATHS ==================================================================== #
+# ============================================================================= #
+
+
+def path(level, fp):
+    def clean(fp):
+        fp = os.path.abspath(fp)
+        return fp.replace(os.path.sep, "/")
+
+    if not fp:
+        raise Exception("Must specify a path.")
+
+    # Allow for forward slash dir separator.
+    fp = fp.replace("/", os.path.sep)
+
+    # If relative to the world file, convert to absolute path.
+    if not os.path.isabs(fp):
+        try:
+            # Find the world directory.
+            level_dir = level.filename
+            level_dir = os.path.abspath(level_dir)
+            level_dir = level_dir.replace("/", os.path.sep)
+            assert level_dir.endswith(os.path.sep + "level.dat")
+            level_dir = os.path.dirname(level_dir)
+        except Exception:
+            raise Exception("Cannot find the world directory, please use an "
+                    "absolute path.")
+        fp = os.path.join(level_dir, fp)
+
+    # Convert to absolute path.
+    fp = os.path.abspath(fp)
+    return fp
+
+
+
+
+# ============================================================================= #
+# == BIOMES =================================================================== #
+# ============================================================================= #
+
+
+# Map of biome nice-names to their ids. Note these are not valid for all
+# versions.
+BIOME_IDOF = OrderedDict([
+    ("Beach", 16),
+    ("Birch Forest", 27),
+    ("Birch Forest M", 155),
+    ("Birch Forest Hills", 28),
+    ("Birch Forest Hills M", 156),
+    ("Cold Beach", 26),
+    ("Cold Taiga", 30),
+    ("Cold Taiga M", 158),
+    ("Cold Taiga Hills", 31),
+    ("Deep Ocean", 24),
+    ("Desert", 2),
+    ("Desert M", 130),
+    ("Desert Hills", 17),
+    ("End", 9),
+    ("Extreme Hills", 3),
+    ("Extreme Hills M", 131),
+    ("Extreme Hills Edge", 20),
+    ("Extreme Hills+", 34),
+    ("Extreme Hills+ M", 162),
+    ("Flower Forest", 132),
+    ("Forest", 4),
+    ("Forest Hills", 18),
+    ("Frozen Ocean", 10),
+    ("Frozen River", 11),
+    ("Ice Mountains", 13),
+    ("Ice Plains", 12),
+    ("Ice Plains Spikes", 140),
+    ("Jungle", 21),
+    ("Jungle M", 149),
+    ("Jungle Edge", 23),
+    ("Jungle Edge M", 151),
+    ("Jungle Hills", 22),
+    ("Mega Spruce Taiga", 160),
+    ("Mega Taiga", 32),
+    ("Mega Taiga Hills", 33),
+    ("Mesa", 37),
+    ("Mesa M", 165),
+    ("Mesa Plateau", 39),
+    ("Mesa Plateau M", 167),
+    ("Mesa Plateau F", 38),
+    ("Mesa Plateau F M", 166),
+    ("Mushroom Island", 14),
+    ("Mushroom Island Shore", 15),
+    ("Nether", 8),
+    ("Ocean", 0),
+    ("Plains", 1),
+    ("Redwood Taiga Hills M", 161),
+    ("River", 7),
+    ("Roofed Forest", 29),
+    ("Roofed Forest M", 157),
+    ("Savanna", 35),
+    ("Savanna M", 163),
+    ("Savanna Plateau", 36),
+    ("Savanna Plateau M", 164),
+    ("Stone Beach", 25),
+    ("Sunflower Plains", 129),
+    ("Swampland", 6),
+    ("Swampland M", 134),
+    ("Taiga", 5),
+    ("Taiga M", 133),
+    ("Taiga Hills", 19),
+    ("Void", 127),
+])
+
+
+# Map of biome ids to their nice-names.
+BIOME_NAMEOF = {bid: name for name, bid in BIOME_IDOF.items()}
+
+
+# Tuple of all biome nice-names.
+BIOME_NAMES = tuple(BIOME_IDOF.keys())
+
+
+# Returns a string of the given biome id.
+def biome_str(biome_id):
+    # If it's a recognised id, return its nice-name.
+    if biome_id in BIOME_NAMEOF:
+        return "\"{}\" (id {})".format(BIOME_NAMEOF[biome_id], biome_id)
+    else:
+        return "unrecognised biome (id: {})".format(biome_id)
+
+
+
+
+# ============================================================================= #
+# == UTIL ===================================================================== #
+# ============================================================================= #
+
+
+AXIS_X = 0 # Typically x-axis.
+AXIS_Z = 1 # Typically z-axis.
+AXIS_Y = 2 # Typically y-axis.
+AXES = (AXIS_X, AXIS_Z, AXIS_Y) # All typical axes.
+
+
+# A list of all adjacents in relative coordinates, aka the voxel positions in a
+# radius 1 cube.
+ADJACENTS = tuple(p for p in product((-1, 0, 1), repeat=3) if p != (0, 0, 0))
 
 
 
@@ -1049,99 +1271,6 @@ def iterate(level, box, method, holey=False):
 
 
 
-
-# Map of biome nice-names to their ids. Note these are not valid for all
-# versions.
-BIOME_IDOF = OrderedDict([
-    ("Beach", 16),
-    ("Birch Forest", 27),
-    ("Birch Forest M", 155),
-    ("Birch Forest Hills", 28),
-    ("Birch Forest Hills M", 156),
-    ("Cold Beach", 26),
-    ("Cold Taiga", 30),
-    ("Cold Taiga M", 158),
-    ("Cold Taiga Hills", 31),
-    ("Deep Ocean", 24),
-    ("Desert", 2),
-    ("Desert M", 130),
-    ("Desert Hills", 17),
-    ("End", 9),
-    ("Extreme Hills", 3),
-    ("Extreme Hills M", 131),
-    ("Extreme Hills Edge", 20),
-    ("Extreme Hills+", 34),
-    ("Extreme Hills+ M", 162),
-    ("Flower Forest", 132),
-    ("Forest", 4),
-    ("Forest Hills", 18),
-    ("Frozen Ocean", 10),
-    ("Frozen River", 11),
-    ("Ice Mountains", 13),
-    ("Ice Plains", 12),
-    ("Ice Plains Spikes", 140),
-    ("Jungle", 21),
-    ("Jungle M", 149),
-    ("Jungle Edge", 23),
-    ("Jungle Edge M", 151),
-    ("Jungle Hills", 22),
-    ("Mega Spruce Taiga", 160),
-    ("Mega Taiga", 32),
-    ("Mega Taiga Hills", 33),
-    ("Mesa", 37),
-    ("Mesa M", 165),
-    ("Mesa Plateau", 39),
-    ("Mesa Plateau M", 167),
-    ("Mesa Plateau F", 38),
-    ("Mesa Plateau F M", 166),
-    ("Mushroom Island", 14),
-    ("Mushroom Island Shore", 15),
-    ("Nether", 8),
-    ("Ocean", 0),
-    ("Plains", 1),
-    ("Redwood Taiga Hills M", 161),
-    ("River", 7),
-    ("Roofed Forest", 29),
-    ("Roofed Forest M", 157),
-    ("Savanna", 35),
-    ("Savanna M", 163),
-    ("Savanna Plateau", 36),
-    ("Savanna Plateau M", 164),
-    ("Stone Beach", 25),
-    ("Sunflower Plains", 129),
-    ("Swampland", 6),
-    ("Swampland M", 134),
-    ("Taiga", 5),
-    ("Taiga M", 133),
-    ("Taiga Hills", 19),
-    ("Void", 127),
-])
-
-
-# Map of biome ids to their nice-names.
-BIOME_NAMEOF = {v: k for k, v in BIOME_IDOF.items()}
-
-
-# Tuple of all biome nice-names.
-BIOME_NAMES = tuple(BIOME_IDOF.keys())
-
-
-# Returns a string of the given biome id.
-def biome_str(biome_id):
-    # If it's a recognised id, return its nice-name.
-    if biome_id in BIOME_NAMEOF:
-        return "\"{}\" (id: {})".format(BIOME_NAMEOF[biome_id], biome_id)
-    else:
-        return "unrecognised biome (id: {})".format(biome_id)
-
-
-
-
-AXIS_X = 0 # Typically x-axis.
-AXIS_Z = 1 # Typically z-axis.
-AXIS_Y = 2 # Typically y-axis.
-AXES = (AXIS_X, AXIS_Z, AXIS_Y) # All typical axes.
-
 # Shifts the values of an array along an axis. Fills any now-empty values with 0
 # if not clamping, otherwise fills it with the first perpendicular slice of the
 # array along the shifted axis. `out` allows preallocated memory to be used,
@@ -1160,8 +1289,6 @@ def shift(array, by, axis, clamp=False, out=None):
         out[:] = array
         return out
 
-    axis_len = array.shape[axis]
-
     # Create the array, if needed, which will be filled with the shifted `array`.
     if out is None:
         out = np.empty_like(array)
@@ -1171,7 +1298,7 @@ def shift(array, by, axis, clamp=False, out=None):
     shifted = slice_along(axis, abs(by), None)
 
     # Slices the section of the array to copy.
-    unshifted = slice_along(axis, None, axis_len - abs(by))
+    unshifted = slice_along(axis, None, -abs(by))
 
     # If it's shifting backwards, just swap the slices.
     if by < 0:
@@ -1241,3 +1368,20 @@ def prefix(name):
     if not name.startswith("minecraft:"):
         name = "minecraft:" + name
     return name
+
+
+
+# Escapes the given string and surrounds it in double-quotes.
+def esc(string):
+    string = string.replace("\\", "\\\\")
+    string = string.replace("\0", "\\0")
+    string = string.replace("\t", "\\t")
+    string = string.replace("\n", "\\n")
+    string = string.replace("\r", "\\r")
+    string = string.replace("\"", "\\\"")
+    return "\"" + string + "\""
+
+
+# Returns "s" if `n` is not 1, otherwise an empty string.
+def plural(n):
+    return "s" if (n != 1) else ""

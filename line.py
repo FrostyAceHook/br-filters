@@ -1,15 +1,33 @@
+import numpy as np
 from pymclevel import alphaMaterials
+
+try:
+    import br
+except ImportError:
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
+
 
 displayName = "Line"
 
+
 inputs = (
-    ("Block:", alphaMaterials.Glowstone),
     ("Sets the blocks in a straight line between the two selection points.",
             "label"),
+    ("Replace:", "string"),
+    ("Block:", alphaMaterials.Glowstone),
+    br.selector_explain("replace"),
 )
 
 
 def perform(level, box, options):
+    replace = br.selector("replace", options["Replace:"])
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
     # Grab the selection blocks, same method as mark sel but without a fallback
@@ -19,11 +37,23 @@ def perform(level, box, options):
 
     # Set all the points in a line.
     for x, y, z in iter_line(x1, y1, z1, x2, y2, z2):
-        level.setBlockAt(x, y, z, bid)
-        level.setBlockDataAt(x, y, z, bdata)
+        # Create a 3d array of just this block, to use with the standard selector
+        # api.
+        ids = np.array([[[level.blockAt(x, y, z)]]])
+        datas = np.array([[[level.blockDataAt(x, y, z)]]])
+        mask = replace.matches(ids, datas)
+
+        # Check if the one block matched.
+        if mask[0, 0, 0]:
+            level.setBlockAt(x, y, z, bid)
+            level.setBlockDataAt(x, y, z, bdata)
+
 
     print "Finished lining."
+    print "- replace: {}".format(replace)
+    print "- block: ({}:{})".format(bid, bdata)
     return
+
 
 
 def iter_line(x, y, z, x2, y2, z2):

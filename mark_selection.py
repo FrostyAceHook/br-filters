@@ -1,6 +1,8 @@
 from pymclevel import alphaMaterials
 
+
 displayName = "Mark Selection"
+
 
 inputs = (
     ("Block:", alphaMaterials.Glowstone),
@@ -15,8 +17,7 @@ def perform(level, box, options):
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
     all_corners = (options["Place at:"] == "all corners")
 
-
-    # Place at all eight corners.
+    # Get them corners.
     if all_corners:
         corners = [
             (x, y, z)
@@ -24,7 +25,6 @@ def perform(level, box, options):
             for y in (box.miny, box.maxy - 1)
             for z in (box.minz, box.maxz - 1)
         ]
-
     else:
         try:
             # Try do a little dodgy and access the "leaked" editor object to set
@@ -43,12 +43,13 @@ def perform(level, box, options):
                 tuple(c - 1 for c in box.maximum),
             ]
 
-
-    # Set the corners.
+    # Set them corners.
     for x, y, z in corners:
         level.setBlockAt(x, y, z, bid)
         level.setBlockDataAt(x, y, z, bdata)
 
 
     print "Finished marking selection."
+    print "- block: ({}:{})".format(bid, bdata)
+    print "- place at: {}".format(options["Place at:"])
     return

@@ -4,11 +4,18 @@ from collections import defaultdict
 try:
     import br
 except ImportError:
-    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
-            "in the same filter folder?")
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
 displayName = "List Biomes"
+
 
 inputs = (
     ("Lists the biomes in the selection to the console.", "label"),
@@ -18,6 +25,8 @@ inputs = (
 
 def perform(level, box, options):
     do_map = options["Map?"]
+
+    print "List biomes:"
 
     # Get all occuring ids and how much they occur.
     totals = defaultdict(int)
@@ -33,9 +42,9 @@ def perform(level, box, options):
 
 
     # Print all the biome names and ids.
-    print "{} biome{}:".format(len(totals), "" if len(totals) == 1 else "s")
+    print "- {} biome{}:".format(len(totals), br.plural(len(totals)))
     for biome, count in totals:
-        print "  {}: {} columns".format(br.biome_str(biome), count)
+        print "   {}: {} columns".format(br.biome_str(biome), count)
 
 
     # Now do a sick map of the entire selection.
@@ -45,7 +54,7 @@ def perform(level, box, options):
     # in the limited charset but also not just one biome).
 
     if do_map and len(totals) == 1:
-        print "No need for a sick map (mono-biomic)."
+        print "- no need for a sick map (mono-biomic)."
         do_map = False
 
     if do_map and len(totals) > len(CHARSET):
@@ -54,7 +63,7 @@ def perform(level, box, options):
         do_map = False
 
     if do_map:
-        print "But now for a sick map:"
+        print "- but now for a sick map:"
 
         # Assign the most-frequent biomes the earliest indices (aka make them
         # darker characters that stand-out less).
@@ -114,5 +123,4 @@ def perform(level, box, options):
             print " '{}' = {}".format(charmap[biome], br.biome_str(biome))
 
 
-    print "Finished listing biomes."
     return

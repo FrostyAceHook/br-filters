@@ -5,8 +5,14 @@ from pymclevel import alphaMaterials
 try:
     import br
 except ImportError:
-    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
-            "in the same filter folder?")
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
 displayName = "Drip-ip"
@@ -22,10 +28,11 @@ DIRECTIONS = OrderedDict([
 ])
 
 inputs = (
-    ("NOTE: Uses a selector string for 'find' and 'replace'.\n"
-            "See `br.py` for the selector string syntax specifics. For simple "
-            "use, just type a block id/name with optional data (i.e. \"stone\" "
-            "for any stone or \"stone:3\" for diorite).", "label"),
+    ("For every 'find' block in the selection, replace a random number of "
+            "blocks in the given 'direction'; provided they are the 'replace' "
+            "block. The number of blocks is a random number between the given "
+            "'min depth' and 'max depth', inclusive of each. Each of these "
+            "\"drips\" only have a 'chance' to be placed.", "label"),
     ("Find:", "string"),
     ("Replace:", "string"),
     ("Block:", alphaMaterials.Stone),
@@ -33,11 +40,7 @@ inputs = (
     ("Min depth:", (1, 0, 256)),
     ("Max depth:", (1, 0, 256)),
     ("Chance%:", (100.0, 0.0, 100.0)),
-    ("For every 'find' block in the selection, replace a random number of "
-            "blocks in the given 'direction'; provided they are the 'replace' "
-            "block. The number of blocks is a random number between the given "
-            "'min depth' and 'max depth', inclusive of each. Each of these "
-            "\"drips\" only have a 'chance' to be placed.", "label"),
+    br.selector_explain("find", "replace"),
 )
 
 
@@ -52,18 +55,18 @@ def perform(level, box, options):
     if depth_max < depth_min:
         raise Exception("'max depth' cannot be smaller than 'min depth'")
 
-    print "Direction: {}".format(options["Direction:"].strip())
-    print "Min depth: {}".format(depth_min)
-    print "Max depth: {}".format(depth_max)
-    print "Chance: {}%".format(options["Chance%:"])
-
 
     find = br.selector("find", options["Find:"])
     replace = br.selector("replace", options["Replace:"])
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
+
+    # Get the find and replace masks for the selection.
+    find_mask = find.mask(level, box)
+    replace_mask = replace.mask(level, box)
+
     # Get the block mask. This is where the real work is.
-    mask = matches(level, box, find, replace, axis, sign, depth_min, depth_max,
+    mask = drip(find_mask, replace_mask, axis, sign, depth_min, depth_max,
             chance)
 
     # Place the blocks.
@@ -74,11 +77,20 @@ def perform(level, box, options):
         ids[cur_mask] = bid
         datas[cur_mask] = bdata
 
+
     print "Finished dripping."
+    print "- find: {}".format(find)
+    print "- replace: {}".format(replace)
+    print "- block: ({}:{})".format(bid, bdata)
+    print "- direction: {}".format(options["Direction:"].strip())
+    print "- depth min: {}".format(depth_min)
+    print "- depth max: {}".format(depth_max)
+    print "- chance: {}%".format(options["Chance%:"])
     return
 
 
-def matches(level, box, find, replace, axis, sign, depth_min, depth_max, chance):
+
+def drip(find_mask, replace_mask, axis, sign, depth_min, depth_max, chance):
     # Algorithm:
     # Mask the find and replace blocks in the whole selection. Shift the find
     # mask block by block, using logical & with the replace mask to select the
@@ -89,24 +101,15 @@ def matches(level, box, find, replace, axis, sign, depth_min, depth_max, chance)
     # until the max depth is reached.
 
 
-    # Create the mask arrays.
-    find_mask = np.empty(br.shape(box), dtype=bool)
-    replace_mask = np.empty_like(find_mask)
-    shifted = np.empty_like(find_mask) # used as memory when shifting.
-
-
-    # Find the masks for the whole selection.
-    for ids, datas, slices in br.iterate(level, box, br.BLOCKS):
-        find_mask[slices] = find.matches(ids, datas)
-        replace_mask[slices] = replace.matches(ids, datas)
-
+    # Allocate some memory for shifting.
+    shifted = np.empty_like(find_mask)
 
     # Use the original find matches as a seed, make sure to removed them after
     # the shifting.
     mask = np.copy(find_mask)
 
     # Randomly cull now.
-    rand = np.random.random_sample(br.shape(box))
+    rand = np.random.random(find_mask.shape)
     mask &= (rand < chance)
 
 
@@ -118,12 +121,13 @@ def matches(level, box, find, replace, axis, sign, depth_min, depth_max, chance)
         mask |= (shifted & replace_mask)
 
 
-    # Now simulate the randomness, if necessary.
+    # Now simulate the random depth, if necessary.
     if depth_max > depth_min:
         # Cull a random amount of replace matches to simulate random depth.
         cull_prop = 1.0 / (depth_max - depth_min + 1)
-        cull = (cull_prop > np.random.random(replace_mask.shape))
-        replace_mask[cull] = 0
+        rand = np.random.random(replace_mask.shape)
+        cull = (cull_prop > rand)
+        replace_mask[cull] = False # pretend they didn't match.
 
 
         # Now do the final shifting and &ing.

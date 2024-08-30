@@ -6,11 +6,18 @@ from pymclevel import TAG_Byte, TAG_Short, TAG_Int, TAG_String, TAG_List, \
 try:
     import br
 except ImportError:
-    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
-            "in the same filter folder?")
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
 displayName = "Random Loot"
+
 
 inputs = (
     ("Fills chests with random loot based on some loot script. The loot script "
@@ -33,40 +40,28 @@ inputs = (
             "\n    enchantment of the item."
             "\n  ench_lvl: integer in 1..32767; dictates the"
             "\n    level of the paired enchantment id."
-            "\nNote the enchantments are optional."
+            "\nNote the enchantments are optional (and the square brackets are "
+            "to indicate that, don't put the brackets in the file)."
+            "\nExample entry:"
+            "\n  45.1 dirt 0 64 16:1 17:1"
+            "\nwhich has a 45.1% chance of adding a stack of dirt with "
+            "sharpness 1 and smite 1."
             , "label"),
-    # Example entry:
-    # 45.1 dirt 0 64 16:1 17:1
-    # which has a 45.1% chance of adding a stack of dirt with sharpness 1 and
-    # smite 1.
 
     ("Loot script path:", "string"),
-    ("Note that \"/\" may be used to separate directories regardless of "
-            "platform. If the path begins with \"./\", it is relative to the "
-            "filter folder. Otherwise, it is considered an absolute path and is "
-            "left unchanged.", "label"),
+    ("If the path is not an absolute path, it is relative to the current world "
+            "folder.", "label"),
     ("Randomly space within chest?", False),
-    ("For non-empty chests:", ("silent", "log", "alert", "add to", "overwrite")),
+    ("For non-empty chests:", ("ignore", "skip + log", "abort", "add to",
+            "overwrite")),
 )
 
 
 
 def perform(level, box, options):
-    path = options["Loot script path:"]
-    randomly_space = options["Randomly space within chest?"]
+    path = br.path(level, options["Loot script path:"])
+    randomly_spaced = options["Randomly space within chest?"]
     non_empty = options["For non-empty chests:"]
-
-    # Tidy up path.
-    path = path.replace(os.path.sep, "/")
-    if path.startswith("./"):
-        here = os.path.abspath(os.path.dirname(__file__))
-        path = os.path.join(here, path)
-    path = os.path.abspath(path)
-    path = path.replace("/", os.path.sep)
-
-    print "Absolute path: {}".format(path)
-    print "Randomly space: {}".format(randomly_space)
-    print "Non-empty: {}".format(non_empty)
 
 
     # Parse the loot script.
@@ -85,12 +80,12 @@ def perform(level, box, options):
         # Handle non-empty chests.
         if te["Items"]:
             s = "Non-empty chest at: {}".format(pos)
-            if non_empty == "silent":
+            if non_empty == "ignore":
                 continue
-            elif non_empty == "log":
+            elif non_empty == "skip + log":
                 print s
                 continue
-            elif non_empty == "alert":
+            elif non_empty == "abort":
                 raise Exception(s)
             elif non_empty == "add to":
                 pass
@@ -107,34 +102,40 @@ def perform(level, box, options):
         # Go through all the items.
         for item in items:
             # random is in the name yk.
-            if rdm.random() > item.chance:
+            if rdm.random() >= item.chance:
                 continue
 
             # Get the slot to put it in.
-            slot = next_slot(te["Items"], randomly_space)
+            slot = next_slot(te["Items"], randomly_spaced)
 
             # Don't overfill the chest.
-            if slot == 27:
+            if slot == INVALID_SLOT:
                 break
+
             te["Items"].append(item.nbt(slot))
 
 
-    print("Added loot to {} chest{}.".format(count, "" if count == 1 else "s"))
+    print "Finished random loot."
+    print "- modified {} chest{}.".format(count, br.plural(count))
+    print "- loot script path: {}".format(br.esc(path))
+    print "- randomly spaced: {}".format(randomly_spaced)
+    print "- non-empty: {}".format(non_empty)
     return
 
 
 
 ALL_SLOTS = set(range(27))
-def next_slot(items, randomly_space):
+INVALID_SLOT = 27
+def next_slot(items, randomly_spaced):
     # Get an array of the available slots in the chest.
     used_slots = set(map(lambda x: int(x["Slot"].value), items))
     free_slots = list(ALL_SLOTS - used_slots)
 
-    # If there are no free slots, return an invalid slot (27) to indicate that.
+    # If there are no free slots, return an invalid slot to indicate that.
     if not free_slots:
-        return 27
+        return INVALID_SLOT
 
-    if randomly_space:
+    if randomly_spaced:
         # Randomly pick a slot.
         return rdm.choice(free_slots)
     else:
@@ -178,7 +179,8 @@ class Entry:
 
 def parse(line, line_number):
     def throw(msg):
-        raise Exception("Syntax error at line {}: {}".format(line_number, msg))
+        raise Exception("Syntax error in loot script at line {}: {}"
+                    .format(line_number, msg))
 
     def next_token(s):
         if not s:
@@ -201,12 +203,14 @@ def parse(line, line_number):
         return s[1:], s[0]
 
     def can_number(token):
-        return all(c in "0123456789." for c in token)
+        try: float(token)
+        except ValueError:
+            return False
+        return True
     def can_integer(token):
-        return all(c in "0123456789" for c in token)
+        return token.isdigit()
     def can_string(token):
         return all(c in "abcdefghijklmnopqrstuvwxyz0123456789_" for c in token)
-
 
 
     # Tokenise.
@@ -220,15 +224,6 @@ def parse(line, line_number):
     if not tokens or tokens[0] == "#":
         return []
 
-    # Check required args.
-    if len(tokens) == 1:
-        throw("need <item id> (and following args).")
-    if len(tokens) == 2:
-        throw("need <item data> (and following args).")
-    if len(tokens) == 3:
-        throw("need <amount>.")
-    # ok if 4 or above.
-
 
     # Parse <percent_chance>.
     if not can_number(tokens[0]):
@@ -238,11 +233,15 @@ def parse(line, line_number):
         throw("<percent_chance> must be in 0..100.")
 
     # Prase <item_id>.
+    if len(tokens) == 1:
+        throw("need <item id> (and following args).")
     if not can_string(tokens[1]):
         throw("<item_id> must be a string.")
     item_id = br.prefix(tokens[1])
 
     # Parse <item_data>.
+    if len(tokens) == 2:
+        throw("need <item data> (and following args).")
     if not can_integer(tokens[2]):
         throw("<item_data> must be an integer.")
     item_data = int(tokens[2])
@@ -250,12 +249,13 @@ def parse(line, line_number):
         throw("<item_data> must be in 0..32767.")
 
     # Parse <amount>.
+    if len(tokens) == 3:
+        throw("need <amount>.")
     if not can_integer(tokens[3]):
         throw("<amount> must be an integer.")
     amount = int(tokens[3])
     if amount < 0 or amount > 255:
         throw("<amount> must be in 0..255.")
-
 
 
     # Parse optional enchants.

@@ -4,21 +4,25 @@ from pymclevel import alphaMaterials, BoundingBox
 try:
     import br
 except ImportError:
-    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
-            "in the same filter folder?")
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
 displayName = "Shell"
 
+
 inputs = (
-    ("NOTE: Uses a selector string for 'find' and 'replace'.\n"
-            "See `br.py` for the selector string syntax specifics. For simple "
-            "use, just type a block id/name with optional data (i.e. \"stone\" "
-            "for any stone or \"stone:3\" for diorite).", "label"),
-    ("Replace:", "string"),
-    ("Block:", alphaMaterials.Bedrock),
     ("Cheeky bedrock box filter. If used with a selection where one dimension "
             "is only 1 block long, it will make a ring.", "label"),
+    ("Replace:", "string"),
+    ("Block:", alphaMaterials.Bedrock),
+    br.selector_explain("replace"),
 )
 
 
@@ -39,6 +43,8 @@ def perform(level, box, options):
 
 
     print "Finished shelling."
+    print "- replace: {}".format(replace)
+    print "- block: ({}:{})".format(bid, bdata)
     return
 
 

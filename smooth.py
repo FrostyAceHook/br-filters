@@ -5,11 +5,18 @@ from pymclevel import alphaMaterials, BoundingBox
 try:
     import br
 except ImportError:
-    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
-            "in the same filter folder?")
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
 displayName = "Smoothest (brain)"
+
 
 inputs = (
     ("Replaces the selection with a smoothed version of the blocks. Within and "
@@ -18,7 +25,7 @@ inputs = (
             "selection will attempt to more smoothly join to the blocks outside "
             "of the selection.", "label"),
     ("Strength:", (3, 1, 15)),
-    ("Feather?", False),
+    ("Feather?", True),
 )
 
 
@@ -34,15 +41,16 @@ def perform(level, box, options):
     strength = options["Strength:"]
     feather = options["Feather?"]
 
-    print "Strength: {}".format(strength)
-    print "Feather: {}".format(feather)
 
     # Copy the selection blocks + surrounding blocks.
     cache, blocks = extract(level, box, strength)
 
+
+    print "Smoothing selection:"
+
     # Get the palette of blocks.
     if len(blocks) == 1:
-        print "Selection only has one block type, no smoothing to perform."
+        print "- selection only has one block type, no smoothing to perform."
         return
     assert len(blocks) == 2
     vid, vdata = blocks[0]
@@ -68,36 +76,10 @@ def perform(level, box, options):
 
     # For a couple laughs just to break up the monotony, calculate a score of how
     # smooth the original blocks were.
+    # NO. no cheeky laughs to break up the monotony. back to work.
 
-    expanded, expanded_box = cache
-    # Still need to correct the neighbour expansion.
-    original = expanded[mask_from(expanded_box, box)]
-
-    # Now get the absolute and proportional difference of the before and after.
-    diff = np.sum(non_void != original)
-    prop = float(diff) / box.volume
-
-    # Cheeky score transform. It look kinda like this:
-    # 100 |-,
-    #     |  \
-    #     |  |
-    #     |   \
-    #     |    \
-    #   0 |     '--_____
-    #     0     0.5     1
-    # tremble at my ascii art powers.
-    if prop > 0.02:
-        score = 100.0 * (prop - 1.0)**8
-    else:
-        score = 100.0 - 2.3318278e11 * prop**6
-    score = int(round(score))
-    # Can't have too much fun now can we. Back to work.
-    score = min(score, 99)
-
-    print "You scored... {}!{}".format(score, " ...were you even trying?" if
-            (score < 5) else "")
-
-    print "Finished smoothing."
+    print "- strength: {}".format(strength)
+    print "- feather: {}".format(feather)
     return
 
 
@@ -175,11 +157,13 @@ def extract(level, box, strength):
 
     # We also gotta return the blocks used.
     if len(unique_blocks) == 2:
-        unique_blocks -= {(vid, vdata)} # remove the void block.
-        blocks = (vid, vdata), next(iter(unique_blocks))
+        blocks = list(unique_blocks)
+        # Ensure that void is the first block.
+        if blocks[1] == (vid, vdata):
+            blocks[1], blocks[0] = blocks
     else:
         # No second block.
-        blocks = ((vid, vdata), )
+        blocks = [(vid, vdata)]
 
     return cache, blocks
 
@@ -228,7 +212,7 @@ def smooth(cache, box, strength, feather):
             cutoff = ((2*size + 1) ** 3) // 2
 
             # Gotta do some awkward logic to get the slices of the current
-            # iteration's box (which shirnks by 1 every iteration).
+            # iteration's box (which shrinks by 1 every iteration).
             inset_by = size - 1
             slices = mask_from(neighbourhood_box, box)
             slices = tuple(

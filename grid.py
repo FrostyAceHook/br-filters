@@ -4,8 +4,14 @@ from pymclevel import alphaMaterials
 try:
     import br
 except ImportError:
-    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
-            "in the same filter folder?")
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
 displayName = "Gridify 4"
@@ -13,15 +19,14 @@ displayName = "Gridify 4"
 
 
 inputs = (
-    ("NOTE: Uses a selector string for 'replace'.\n"
-            "See `br.py` for the selector string syntax specifics. For simple "
-            "use, just type a block id/name with optional data (i.e. \"stone\" "
-            "for any stone or \"stone:3\" for diorite).", "label"),
+    ("issa grid innit. Swap blocks is a purely convenience option, which acts "
+            "as-if 'block 2' had been selected for 'block 1', and vice versa.",
+            "label"),
     ("Replace:", "string"),
     ("Block 1:", alphaMaterials.Stone),
     ("Block 2:", alphaMaterials.Cobblestone),
     ("Swap blocks?", False),
-    ("issa grid innit. Swap blocks is a purely convenience option.", "label"),
+    br.selector_explain("replace"),
 )
 
 
@@ -58,6 +63,10 @@ def perform(level, box, options):
 
 
     print "Finished gridifying."
+    print "- replace: {}".format(replace)
+    print "- block 1: ({}:{})".format(bid1, bdata1)
+    print "- block 2: ({}:{})".format(bid2, bdata2)
+    print "- swap blocks: {}".format(bool(swap))
     # you ever just wanna eat a shoe.
     # i eat sneakers.
     return

@@ -1,14 +1,16 @@
 from itertools import product
 from pymclevel import alphaMaterials
 
+
 displayName = "Mark Centre"
 
+
 inputs = (
-    ("Block:", alphaMaterials.Glowstone),
     ("Replaces the very centre point of the selection with the block above. "
             "Used to quickly find the centre of something (shocking). If any "
             "dimension is even in length, two blocks are placed along that "
             "direction.", "label"),
+    ("Block:", alphaMaterials.Glowstone),
 )
 
 
@@ -32,4 +34,5 @@ def perform(level, box, options):
 
 
     print "Finished marking centre."
+    print "- block: ({}:{})".format(bid, bdata)
     return

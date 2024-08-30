@@ -4,36 +4,39 @@ from pymclevel import alphaMaterials
 try:
     import br
 except ImportError:
-    raise ImportError("Couldn't find 'br.py', have you downloaded it and put it "
-            "in the same filter folder?")
+    raise ImportError("Couldn't find 'br.py', have you put it in the same "
+            "filter folder? It can be downloaded from: "
+            "github.com/FrostyAceHook/br-filters")
+try:
+    br.require_version(2, 1)
+except AttributeError:
+    raise ImportError("Outdated version of 'br.py'. Please download the latest "
+            "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
 displayName = "Noise"
 
+
 inputs = (
-    ("NOTE: Uses a selector string for 'replace'.\n"
-            "See `br.py` for the selector string syntax specifics. For simple "
-            "use, just type a block id/name with optional data (i.e. \"stone\" "
-            "for any stone or \"stone:3\" for diorite).", "label"),
-    ("Replace:", "string"),
-    ("Block:", alphaMaterials.Stone),
-    ("Seed:", 0),
-    ("Scale:", (12, 1, 256)),
-    ("Octaves:", (2, 1, 20)),
-    ("If seed is non-zero, it can be used to produce the same noise when paired "
-            "with the same selection size. Scale controls the general size of "
-            "the fluctations. Octaves increase the chaos of the noise. Smooth "
-            "reduces the chaos of the noise.", "label"),
-    ("Value min:", (0.0, 0.0, 1.0)),
-    ("Value max:", (0.4, 0.0, 1.0)),
-    ("Essentially, the noise just assigns all blocks a random value between 0 "
-            "and 1, and then any 'replace' blocks which have a value between "
-            "'value min' and 'value max' get replaced. So:"
+    ("If seed is non-zero, it can be used to reproduce this noise. Scale "
+            "controls the general size of the fluctations. Octaves increase the "
+            "chaos of the noise.", "label"),
+    ("Essentially, the noise assigns all blocks a random value between 0 and 1, "
+            "and then any 'replace' blocks which have a value between 'value "
+            "min' and 'value max' get replaced. So:"
             "\n- ('value max' - 'value min') is roughly the proportion of "
                 "blocks that will be replaced."
             "\n- for swirly noise, centre min and max around 0.5."
             "\n- for clumpy noise, keep min close to 0 (or max close to 1).",
             "label"),
+    ("Replace:", "string"),
+    ("Block:", alphaMaterials.Stone),
+    ("Seed:", (0, 0, 10**9 - 1)),
+    ("Scale:", (12, 1, 256)),
+    ("Octaves:", (2, 1, 20)),
+    ("Value min:", (0.0, 0.0, 1.0)),
+    ("Value max:", (0.4, 0.0, 1.0)),
+    br.selector_explain("replace"),
 )
 
 
@@ -65,14 +68,9 @@ def perform(level, box, options):
     replace = br.selector("replace", options["Replace:"])
     bid, bdata = options["Block:"].ID, options["Block:"].blockData
 
-    print "Seed: {}".format(seed)
-    print "Scale: {}".format(scale)
-    print "Octaves: {}".format(octaves)
-    if not visualise:
-        print "Value min: {}".format(value_min)
-        print "Value max: {}".format(value_max)
-    else:
-        print "Acsending (visualising)"
+    if value_max < value_min:
+        raise Exception("'value max' cannot be smaller than 'value min'")
+
 
     # Seed this thing.
     np.random.seed(seed)
@@ -119,6 +117,11 @@ def perform(level, box, options):
 
 
     print "Finished making some noise."
+    print "- seed: {}".format(seed)
+    print "- scale: {}".format(scale)
+    print "- octaves: {}".format(octaves)
+    print "- value min: {}".format(value_min)
+    print "- value max: {}".format(value_max)
     return
 
 
