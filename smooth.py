@@ -9,22 +9,21 @@ except ImportError:
             "filter folder? It can be downloaded from: "
             "github.com/FrostyAceHook/br-filters")
 try:
-    br.require_version(2, 1)
+    br.require_version(2, 2)
 except AttributeError:
     raise ImportError("Outdated version of 'br.py'. Please download the latest "
             "compatible version from: github.com/FrostyAceHook/br-filters")
 
 
-displayName = "Smoothest (brain)"
+displayName = "Smooth"
 
 
 inputs = (
-    ("Replaces the selection with a smoothed version of the blocks. Within and "
-            "up-to 'strength' blocks outside of the selection, there must be at-"
-            "most two different blocks. When feathering, the edges of the "
-            "selection will attempt to more smoothly join to the blocks outside "
-            "of the selection.", "label"),
-    ("Strength:", (3, 1, 15)),
+    ("Replaces the selection with a smoothed version of the blocks. When "
+            "feathering, the edges of the selection will attempt to more "
+            "smoothly join to the blocks outside of the selection.", "label"),
+    ("Note that this WILL mess up any block variation.", "label"),
+    ("Strength:", (3, 1, 32)),
     ("Feather?", True),
 )
 
@@ -42,205 +41,164 @@ def perform(level, box, options):
     feather = options["Feather?"]
 
 
-    # Copy the selection blocks + surrounding blocks.
-    cache, blocks = extract(level, box, strength)
+    if not feather:
+        # If no feather, simple call to `smooth`.
+        smooth(level, box, strength=strength)
+    else:
+        # Otherwise we gotta pull a nasty feather algo on this bitch. The
+        # algorithm is:
+        # - run the full smooth everywhere EXCEPT leave a "deadmans" space
+        #       around the edges of the selection.
+        # - this space has a depth of `strength-1` blocks.
+        # - in shells starting from the already-smoothed area, runs smooths of
+        #       steadily decreasing strength.
+        # - these shell stack on-top of each other and creep towards the bounds
+        #       of selection.
+        # - all shells operate after the previous smooth is complete, they "see"
+        #       the block changes it produces.
+        # - eventually, the outer-most shell will be smoothed with strength 1.
+        # - done.
 
+        # Rename these things.
+        full_box = box
+        full_strength = strength
 
-    print "Smoothing selection:"
+        # The shells must have "time" to drop to a smooth strength of 1, so this
+        # is the inverse calc to ensure it can.
+        strength = min(full_strength, min((x + 1)/2 for x in full_box.size))
 
-    # Get the palette of blocks.
-    if len(blocks) == 1:
-        print "- selection only has one block type, no smoothing to perform."
-        return
-    assert len(blocks) == 2
-    vid, vdata = blocks[0]
-    nvid, nvdata = blocks[1]
+        # Setup the mask array for smooth, initially all blocks are included.
+        mask = np.ones(br.shape(full_box), dtype=bool)
 
+        # Complete the full smooth on the inside section.
+        box = full_box.expand(-strength + 1) # shrink.
+        smooth(level, box, strength=strength)
 
-    # Get the smoothed blocks. This is a boolean array where true = non-void.
-    non_void = smooth(cache, box, strength, feather)
+        # Now iterate through the shells, inner-most to outer-most.
+        for s in range(strength - 1, 0, -1):
+            # Maks out the earlier smooths.
+            mask[br.submask(full_box, box)] = False
+            # Include this shell's mask.
+            box = box.expand(1)
+            shell = mask[br.submask(full_box, box)]
 
-    # Copy to level.
-    for ids, datas, slices in br.iterate(level, box, br.BLOCKS):
-        # Get the non-void mask of this slice.
-        nv = non_void[slices]
+            # SHMOOTH
+            smooth(level, box, strength=s, mask=shell)
 
-        # Replace the non-void blocks.
-        ids[nv] = nvid
-        datas[nv] = nvdata
-
-        # Replace the void blocks.
-        ids[nv == False] = vid # double negative.
-        datas[nv == False] = vdata
+        # Restore the thangs for logging purposes.
+        strength = full_strength
+        box = full_box
 
 
     # For a couple laughs just to break up the monotony, calculate a score of how
     # smooth the original blocks were.
     # NO. no cheeky laughs to break up the monotony. back to work.
 
+    print "Finished smoothing:"
     print "- strength: {}".format(strength)
     print "- feather: {}".format(feather)
     return
 
 
 
-def extract(level, box, strength):
+# Performs a smooth of `strength` over `box`. If `mask` is non-none, it is a
+# boolean mask of blocks to modify.
+def smooth(level, box, strength, mask=None):
+    # Get the neighbourhood box, which includes some extra blocks in each
+    # direction.
+    nbh = get_neighbourhood(level, box, strength)
+
+    # Cache all the blocks and their locations.
+    blocks = extract(level, nbh)
+
+    # "Smear" the blocks to their surrounding, effectively "smoothing" the
+    # blocks.
+    smear(blocks, strength)
+
+    # Extract the most common block at each location.
+    bids, bdatas = most_common(blocks)
+
+    # Trim the new blocks to the selection, instead of the entire neighbourhood.
+    bids = bids[br.submask(nbh, box)]
+    bdatas = bdatas[br.submask(nbh, box)]
+
+    # Set the blocks. Not holey because the rest of the algorithm cant be.
+    for ids, datas, slices in br.iterate(level, box, br.BLOCKS):
+        if mask is not None:
+            # Use the mask if supplied.
+            m = mask[slices]
+            ids[m] = bids[slices][m]
+            datas[m] = bdatas[slices][m]
+        else:
+            # Otherwise overwrite all blocks.
+            ids[:] = bids[slices]
+            datas[:] = bdatas[slices]
+
+
+
+# Returns the neighbourhood box.
+def get_neighbourhood(level, box, strength):
     # Need to expand the box to include `strength` extra blocks in all
     # directions, so that we can find the blocks in a `strength` radius around
     # every block in the actual selection. Aka, we don't need each house, we need
-    # the whole neighbourhood.
-    neighbourhood_box = box.expand(strength)
+    # the whole neighbourhood. Also, if feathering we only need 1 additional
+    # block in each direction.
+    nbh = box.expand(strength)
 
     # We can just clamp the y axis instead of throwing if the selection grows too
     # tall. This clamping is dealt with in `smooth` when shifting, by assuming
     # that the closest layer is repeated out-of-bounds.
-    x, _, z = neighbourhood_box.origin
-    w, _, l = neighbourhood_box.size
+    x, _, z = nbh.origin
+    w, _, l = nbh.size
     max_box = BoundingBox(origin=(x, 0, z), size=(w, 256, l))
-    neighbourhood_box = neighbourhood_box.intersect(max_box)
-
+    nbh = nbh.intersect(max_box)
 
     # However, must ensure that we don't go out of bounds of the world. So check
     # all the chunks the box touches actually exist. Check first, with a
     # different message, that the actual selection doesn't contain missing
     # chunks.
-    must_exist(level, box, "Selection cannot contain missing chunks.")
-    must_exist(level, neighbourhood_box, "Selection is too close to missing "
-            "chunks.")
+    if not br.chunks_exist(level, box):
+        raise Exception("Selection cannot contain missing chunks.")
+    if not br.chunks_exist(level, nbh):
+        raise Exception("Selection is too close to missing chunks.")
+
+    return nbh
 
 
-    # We need to pick one block to act as the "void" block. The operation is
-    # "symmetrical" with respect to this block so it doesn't matter what we
-    # choose.
-    vid = level.blockAt(*box.origin)
-    vdata = level.blockDataAt(*box.origin)
+# Returns a dictionary of blocks (as `bid, bdata`) to a `np.uin16` array of their
+# locations in selection (where =0 does not match and =1 means matches).
+def extract(level, nbh):
+    blocks = {}
+
+    # Go through all the unique blocks in the selection.
+    for ids, datas, slices in br.iterate(level, nbh, br.BLOCKS):
+        for block in br.unique_blocks(ids, datas):
+            # If this is the first time this block showed up, we must assume it's
+            # never showed up anyway and initialise to zeroes.
+            if block not in blocks:
+                blocks[block] = np.zeros(br.shape(nbh), dtype=np.uint16)
+
+            # Update this block's mask.
+            bid, bdata = block
+            blocks[block][slices] = ((ids == bid) & (datas == bdata))
+
+    return blocks
 
 
-    # The unique blocks in the level, stored as a set of tuples of (bid, bdata).
-    # I think the bid and bdata are of type np.uint16 not int but it doesn't
-    # really matter.
-    unique_blocks = set()
+# Adds all neighbour influences to each block's array.
+def smear(blocks, strength):
+    # Allocate two arrays that are used for temporary memory.
+    example_mask = blocks.values()[0]
+    tmp1 = np.empty_like(example_mask)
+    tmp2 = np.empty_like(example_mask)
 
-    # Now cache which blocks are non-void.
-    neighbourhood = np.empty(br.shape(neighbourhood_box), dtype=bool)
-    for ids, datas, slices in br.iterate(level, neighbourhood_box, br.BLOCKS):
-        # Get a list of all the blocks in this iteration.
-        blocks = np.stack((ids, datas), axis=-1)
-        blocks = blocks.reshape(-1, 2)
-        # Now axis=0 goes along the blocks and axis=1 stores the bid, bdata.
-
-        # However, since this version of numpy doesn't have an axis argument for
-        # `unique`, we gotta roll our own.
-
-        # Treat the rows of bid,bdata pairs as a single element.
-        merged_dtype = np.dtype((np.void, 2 * blocks.dtype.itemsize))
-        merged_blocks = blocks.view(merged_dtype)
-
-        # Find the unique blocks.
-        unique = np.unique(merged_blocks)
-
-        # Convert back to the unpacked view.
-        unique = unique.view(blocks.dtype).reshape(-1, 2)
-
-        # Add the unique blocks. Note we convert to a tuple to make it hashable.
-        unique_blocks |= set((bid, bdata) for bid, bdata in unique)
-
-        # Add the non-void masks.
-        neighbourhood[slices] = ((ids != vid) | (datas != vdata))
-
-    # If there are more than 2 blocks in the selection, no can do.
-    if len(unique_blocks) > 2:
-        raise Exception("Selection/surroundings have more than 2 block types.")
+    # Add in a cube for each block.
+    for mask in blocks.values():
+        sum_cube(mask, strength, tmp1, tmp2)
 
 
-    cache = neighbourhood, neighbourhood_box
-
-    # We also gotta return the blocks used.
-    if len(unique_blocks) == 2:
-        blocks = list(unique_blocks)
-        # Ensure that void is the first block.
-        if blocks[1] == (vid, vdata):
-            blocks[1], blocks[0] = blocks
-    else:
-        # No second block.
-        blocks = [(vid, vdata)]
-
-    return cache, blocks
-
-
-
-def smooth(cache, box, strength, feather):
-    neighbourhood, neighbourhood_box = cache
-
-    # Need to replace every value with the sum of its neighbours, up to
-    # `strength` blocks away. Cast to uint16 to be able to store that count.
-    summed = neighbourhood.astype(np.uint16)
-
-
-    # Preallocate some memory.
-    tmp1 = np.empty_like(summed)
-    tmp2 = np.empty_like(summed)
-
-    if not feather:
-
-        # Sum in a cube around each block.
-        sum_cube(summed, strength, tmp1, tmp2)
-
-        # To find which blocks should be non-void, we check if it has more
-        # neighbours of non-void than not. That is, if the average block around
-        # this one is non-void. This is simply a matter of checking if it's
-        # greater than half the neighbour (cube) volume. Note that this will always
-        # be an odd number, so we can always get a clean majority.
-        cutoff = ((2*strength + 1) ** 3) // 2
-        non_void = (summed > cutoff)
-
-    else:
-        # If we are feathering, we want the smooth strength to linearly increase
-        # from 1 to its maximum (`strength`) when going from the outside inwards.
-        # Essentially, shells of increasing smooth radius.
-
-        non_void = np.empty(summed.shape, dtype=bool)
-
-        # The smoothed array for the current smooth radius.
-        this = np.empty_like(summed)
-
-        # Build up to the full smooth strength.
-        for size in range(1, strength + 1):
-            # Do this iteration of smooth strength.
-            this[:] = summed
-            sum_cube(this, size, tmp1, tmp2)
-            cutoff = ((2*size + 1) ** 3) // 2
-
-            # Gotta do some awkward logic to get the slices of the current
-            # iteration's box (which shrinks by 1 every iteration).
-            inset_by = size - 1
-            slices = mask_from(neighbourhood_box, box)
-            slices = tuple(
-                slice(s.start + inset_by, s.stop - inset_by)
-                for s in slices
-            )
-
-            # Set this section. Note this always includes the centre, so while
-            # early iterations will affect more than just a shell, the inside
-            # will be overwritten by later ones so the overall effect is a shell.
-            non_void[slices] = (this > cutoff)[slices]
-
-
-    # Cut the array from the neighbourhood shape to the user selection box. Can't
-    # just hard-code strength:len-strength because the cache shape can be
-    # unpredictable with clipping due to world boundaries.
-    mask = mask_from(neighbourhood_box, box)
-    non_void = non_void[mask]
-
-    # Too easy.
-    return non_void
-
-
-
+# Simple algorithm to in-place sum in a cube of radius `size` around each cell.
 def sum_cube(array, size, tmp1, tmp2):
-    # Simple algorithm to in-place sum in a cube of radius `size` around each
-    # cell.
-
     # Across axes, a stack-on effect is desired.
     for axis in br.AXES:
         # Within an axis however, that stack-on would make a non-linear sum.
@@ -254,22 +212,21 @@ def sum_cube(array, size, tmp1, tmp2):
             array += br.shift(tmp1, by, axis, clamp=True, out=tmp2)
 
 
+# Returns a tuple of `bids, bdatas`, where each block is the most common of the
+# blocks at that location.
+def most_common(blocks):
+    # Get a 4d array of all block counts.
+    all_blocks = np.stack(list(blocks.values()))
 
-# Throws if any chunks in the given box don't exist.
-def must_exist(level, box, msg):
-    for cx, cz in box.chunkPositions:
-        if not level.containsChunk(cx, cz):
-            raise Exception(msg)
+    # Find the index (into `blocks`) of the most common block (which will have
+    # the maximum count).
+    most_common_indices = np.argmax(all_blocks, axis=0)
 
+    # Get a numpy vectorized function to convert the indices to the block id and
+    # data.
+    index = list(blocks.keys())
+    lookup = np.vectorize(lambda i: index[i])
 
-# Returns a mask which may be applied to an array of the `neighbourhood_box`
-# which will index the blocks in `box`.
-def mask_from(neighbourhood_box, box):
-    # We want to get the intersection of the two boxes, in a mark relative to the
-    # neighbourhood. We know the neighboorhood is always larger, so the size of
-    # final mask will be the same as `box`. So we can just shift the `box` to
-    # have an origin at the origin of `neighbourhood` to find the indices we
-    # need.
-    assert all(a >= b for a, b in zip(neighbourhood_box.size, box.size))
-    mask_box = BoundingBox(box.origin - neighbourhood_box.origin, box.size)
-    return br.slices(mask_box)
+    # Return the thang. Note that this numpy vectorized function will return a
+    # tuple of arrays (not an array of tuples, however that would work).
+    return lookup(most_common_indices)

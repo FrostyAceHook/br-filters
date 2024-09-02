@@ -2,7 +2,7 @@ import numpy as np
 import os
 from collections import OrderedDict
 from itertools import product
-from pymclevel import TileEntity, Entity
+from pymclevel import BoundingBox, Entity, TileEntity
 
 
 # Selector string syntax.
@@ -70,7 +70,7 @@ from pymclevel import TileEntity, Entity
 
 
 # Version of 'br.py'. Follows semantic versioning.
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 
 # Checks that the current 'br.py' version matches the given `major`, and at-least
@@ -1206,9 +1206,8 @@ def iterate(level, box, method, holey=False):
     # filters which only process entities have no need and filters explicitly
     # marked "holey" will be fine with missing chunks.
     if not (method in {TES, ENTITIES} or holey):
-        for cx, cz in box.chunkPositions:
-            if not level.containsChunk(cx, cz):
-                raise Exception("Selection cannot contain missing chunks.")
+        if not chunks_exist(level, box):
+            raise Exception("Selection cannot contain missing chunks.")
 
 
     # Iterate through the level selection.
@@ -1350,6 +1349,31 @@ def slice_along(axis, start, end, step=None):
 
 
 
+# Returns a list of the unique blocks, where each block is (bid, bdata).
+def unique_blocks(ids, datas):
+    # Stack the ids and datas into a numpy array.
+    blocks = np.stack((ids, datas), axis=-1)
+    blocks = blocks.reshape(-1, 2)
+    # Now axis=0 goes along the blocks and axis=1 stores the bid, bdata.
+
+    # However, since this version of numpy doesn't have an axis argument for
+    # `unique`, we gotta roll our own (thus the need for this function).
+
+    # Treat the rows of bid,bdata pairs as a single element.
+    merged_dtype = np.dtype((np.void, 2 * blocks.dtype.itemsize))
+    merged_blocks = blocks.view(merged_dtype)
+
+    # Find the unique blocks.
+    unique = np.unique(merged_blocks)
+
+    # Convert back to the unpacked view.
+    unique = unique.view(blocks.dtype).reshape(-1, 2)
+
+    # Convert to a list of tuples.
+    return [(bid, bdata) for bid, bdata in unique]
+
+
+
 # Returns the shape of the box, in x,z,y order.
 def shape(box):
     # Cheeky unpack, reorder and repack.
@@ -1360,6 +1384,18 @@ def shape(box):
 def slices(box):
     x, y, z = [slice(p1, p2) for p1, p2 in zip(box.origin, box.maximum)]
     return x, z, y
+
+# Returns a mask which when used to index an array of shape `br.shape(box)` will
+# index the coordinates of `sub_box`.
+def submask(box, sub_box):
+    assert sub_box == box.intersect(sub_box)
+    mask_box = BoundingBox(sub_box.origin - box.origin, sub_box.size)
+    return slices(mask_box)
+
+
+# Returns true if all chunks in the given box exist.
+def chunks_exist(level, box):
+    return all(level.containsChunk(cx, cz) for cx, cz in box.chunkPositions)
 
 
 

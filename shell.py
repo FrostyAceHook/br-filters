@@ -8,7 +8,7 @@ except ImportError:
             "filter folder? It can be downloaded from: "
             "github.com/FrostyAceHook/br-filters")
 try:
-    br.require_version(2, 1)
+    br.require_version(2, 2)
 except AttributeError:
     raise ImportError("Outdated version of 'br.py'. Please download the latest "
             "compatible version from: github.com/FrostyAceHook/br-filters")
@@ -57,8 +57,7 @@ def get_shell(box):
     # positions from.
 
     # Shrink in every direction except for any with 1 length (may be none).
-    shrinked_box = BoundingBox(size=box.size) # relative to 0,0,0.
-    shrinked_box = shrinked_box.expand(*(-(d != 1) for d in box.size))
+    shrinked_box = box.expand(*(-(d != 1) for d in box.size))
     # shrunk
     # shronk
     # shrenk
@@ -68,6 +67,6 @@ def get_shell(box):
     mask = np.ones(br.shape(box), dtype=bool)
 
     # Exclude the inner box.
-    mask[br.slices(shrinked_box)] = 0
+    mask[br.submask(box, shrinked_box)] = False
 
     return mask
