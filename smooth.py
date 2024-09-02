@@ -23,9 +23,12 @@ inputs = (
             "feathering, the edges of the selection will attempt to more "
             "smoothly join to the blocks outside of the selection.", "label"),
     ("Note that this WILL mess up any block variation.", "label"),
-    ("Strength:", (3, 1, 32)),
+    ("Strength:", (3, 1, 16)),
     ("Feather?", True),
 )
+
+count_type = np.uint16 # up-to 64k volume.
+
 
 
 # Smoothing algorithm:
@@ -165,8 +168,8 @@ def get_neighbourhood(level, box, strength):
     return nbh
 
 
-# Returns a dictionary of blocks (as `bid, bdata`) to a `np.uin16` array of their
-# locations in selection (where =0 does not match and =1 means matches).
+# Returns a dictionary of blocks (as `bid, bdata`) to a `count_type` array of
+# their locations in selection (where =0 does not match and =1 means matches).
 def extract(level, nbh):
     blocks = {}
 
@@ -176,7 +179,7 @@ def extract(level, nbh):
             # If this is the first time this block showed up, we must assume it's
             # never showed up anyway and initialise to zeroes.
             if block not in blocks:
-                blocks[block] = np.zeros(br.shape(nbh), dtype=np.uint16)
+                blocks[block] = np.zeros(br.shape(nbh), dtype=count_type)
 
             # Update this block's mask.
             bid, bdata = block
